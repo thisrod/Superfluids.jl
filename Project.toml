@@ -1,0 +1,12 @@
+name = "Superfluids"
+uuid = "01347403-e5cf-4a60-9350-9edf4e6960f2"
+authors = ["Rodney Polkinghorne <thisrod@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
+ComplexPhasePortrait = "38ac1a67-8e16-5889-9a62-b2c9995eb50f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
