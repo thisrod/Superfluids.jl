@@ -31,7 +31,7 @@ default!(v::Superfluid) = default!(:superfluid, v)
 A domain with a way to discretise an order parameter on it.
 """
 abstract type Discretisation{N} end
-
+Discretisation() = default(:discretisation)
 default!(v::Discretisation) = default!(:discretisation, v)
 
 """

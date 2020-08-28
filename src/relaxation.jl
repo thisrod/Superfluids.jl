@@ -12,13 +12,7 @@ function steady_state(s::Superfluid, d::Discretisation;
         method=ConjugateGradient(manifold=Sphere()),
         iterations=default(:iterations))
     L, H = operators(s, d, :L, :H)
-    result = optimize(
-        ψ -> dot(ψ,H(ψ,Ω)) |> real,
-        (buf,ψ) -> copyto!(buf, 2*L(ψ,Ω)),
-        initial,
-        method,
-        Optim.Options(iterations=iterations, g_tol=g_tol, allow_f_increases=true)
-    )
+    result = relax(s, d, initial, Ω, g_tol, method, iterations)
     Optim.converged(result) || error("Ground state failed to converge")
     result.minimizer
 end
@@ -32,17 +26,55 @@ steady_state(d::Discretisation; args...) =
 
 
 """
-    cloud(d::Discretisation)
+    relax(s, d, initial, Ω, g_tol, method, iterations)
+
+Return an Optim.whatever for the order parameter with fixed rv
+
+The initial guess φ₀ is relaxed to residual (L-μ)ψ < g_tol.
+"""
+function relax(s::Superfluid, d::Discretisation,
+        initial, Ω, g_tol, method, iterations)
+    L, H = operators(s, d, :L, :H)
+    optimize(
+        ψ -> dot(ψ,H(ψ,Ω)) |> real,
+        (buf,ψ) -> copyto!(buf, 2*L(ψ,Ω)),
+        initial,
+        method,
+        Optim.Options(iterations=iterations, g_tol=g_tol, allow_f_increases=true)
+    )
+end
+
+
+"""
+    relax_field(s, d, rvs, Ω; g_tol, iterations)
+
+
+"""
+relax_field(s::Superfluid, d::Discretisation, rvs, Ω; g_tol=default(:g_tol),
+        iterations=default(:iterations)) =
+    steady_state(s, d; Ω, iterations, g_tol,
+        initial=cloud(d, rvs...),
+        method=ConjugateGradient(manifold=PinnedVortices(d, rvs...)))
+
+
+"""
+    cloud(d::Discretisation, rvs...)
 
 Sample a smooth field that will efficiently relax
 """
-function cloud(d::FDDiscretisation{2})
+function cloud(d::FDDiscretisation{2}, rvs::Vararg{Complex{Float64}})
     f(x,y) = cos(π*x/(d.n+1)/d.h)*cos(π*y/(d.n+1)/d.h)
-    φ = sample(f, d)
-    φ ./= norm(φ)
+    z = argand(d)
+    φ = similar(z)
+    φ .= sample(f, d)
+    for r in rvs
+        @. φ *= (z-r)
+    end
+    normalize!(φ)
 end
 
-cloud() = cloud(default(:discretisation))
+cloud(rvs::Vararg{Complex{Float64}}) = cloud(default(:discretisation), rvs...)
+
 
 """
     PinnedVortices([s], [d], rv...) <: Optim.Manifold
@@ -57,39 +89,36 @@ at every rv (and maybe at other points too).
 struct PinnedVortices <: Manifold
    ixs::Matrix{Int}		# 2D array, column of indices for each vortex
    U::Matrix{Complex{Float64}}		# U[i,j] is a coefficient for z[ixs[i,j]]
-   function PinnedVortices(s::Superfluid, d::Discretisation, rvs::Vararg{Complex{Float64}})
+   function PinnedVortices(d::Discretisation, rvs::Vararg{Complex{Float64}})
         z = argand(d)
         ixs = Array{Int}(undef, 4, length(rvs))
         U = ones(eltype(z), size(ixs))
         for (j, rv) = pairs(rvs)
             ixs[:,j] = sort(eachindex(z), by=k->abs(z[k]-rv))[1:4]
-            a = normalize!(z[ixs[:,j]].-rv)
+            a = normalize(z[ixs[:,j]].-rv)
             U[:,j] .-= a*(a'*U[:,j])
             # Orthonormalise as we go
+            # TODO test and uncomment this
             # TODO check for which order Gram-Schmidt is stable
             # Although these are only parallel if two vortices are within a pixel
-            for k = 1:j
-                a = zeros(eltype(z), 4)
-                for m = 1:4
-                    n = findfirst(isequal(ixs[m,j]), ixs[:,k])
-                    isnothing(n) || (a[n] = U[n,k])
-                end
-                U[:,j] .-= a*(a'*U[:,j])
-            end
-            normalize!(U[:,j])
+#             for k = 1:j
+#                 a = zeros(eltype(z), 4)
+#                 for m = 1:4
+#                     n = findfirst(isequal(ixs[m,j]), ixs[:,k])
+#                     isnothing(n) || (a[n] = U[n,k])
+#                 end
+#                 U[:,j] .-= a*(a'*U[:,j])
+#             end
+            U[:,j] = normalize(U[:,j])
         end
         new(ixs, U)
    end
 end
 
-PinnedVortices(s::Superfluid, d::Discretisation, rvs::Vararg{Number}) =
-    PinnedVortices(s, d, [convert(Complex{Float64}, r) for r in rvs]...)
-PinnedVortices(rvs::Vararg{Number}) =
-    PinnedVortices(default(:superfluid), default(:discretisation), rvs...)
-PinnedVortices(s::Superfluid, rvs::Vararg{Number}) =
-    PinnedVortices(s, default(:discretisation), rvs...)
 PinnedVortices(d::Discretisation, rvs::Vararg{Number}) =
-    PinnedVortices(default(:superfluid), d, rvs...)
+    PinnedVortices(d, [convert(Complex{Float64}, r) for r in rvs]...)
+PinnedVortices(rvs::Vararg{Number}) =
+    PinnedVortices(default(:discretisation), rvs...)
 
 function prjct!(M, q)
     for j = 1:size(M.ixs,2)
