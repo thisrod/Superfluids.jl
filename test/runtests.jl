@@ -26,3 +26,6 @@ end
 
 Check zero mode for BdGmat
 """
+
+# Check that relaxed orbiting vortices and lattices have the right
+# winding number around the trap edge.

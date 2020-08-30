@@ -1,6 +1,6 @@
 module Superfluids
 
-export Superfluid, Discretisation, FDDiscretisation, PinnedVortices, discretise, argand, cloud, steady_state, sample, find_vortex
+export Superfluid, Discretisation, FDDiscretisation, PinnedVortices, discretise, argand, cloud, steady_state, sample, find_vortex, relax_field, relax_orbit
 using LinearAlgebra, BandedMatrices, Optim
 using Statistics: mean
 

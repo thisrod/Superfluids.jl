@@ -56,6 +56,29 @@ relax_field(s::Superfluid, d::Discretisation, rvs, Ω; g_tol=default(:g_tol),
         initial=cloud(d, rvs...),
         method=ConjugateGradient(manifold=PinnedVortices(d, rvs...)))
 
+"""
+    Ω, q = relax_orbit(s, d, r; Ωs, g_tol, iterations)
+
+Find a frequency and order parameter with a stable orbit at radius r
+
+The rotating frame energy of a stable orbit is a maximum wrt changes
+in the orbit radius, but it is not stationary with respect to Ω;
+usually it increases monotonically.  Therefore the only way to find
+the steady Ω is to minimize the residual, although this is a bit
+inelegant.
+"""
+function relax_orbit(s, d, r; Ωs, g_tol, iterations)
+    #TODO Convergence parameters for optimize
+    r = Complex{Float64}[r]
+    L = only(operators(s, d, :L))
+    function residual(Ω)
+        q = relax_field(s,d,r, Ω; g_tol, iterations)
+        μ = dot(L(q), q)
+        norm(L(q)-μ*q)
+    end
+    Ω = optimize(residual, Ωs...).minimizer
+    Ω, relax_field(s,d,r, Ω; g_tol, iterations)
+end
 
 """
     cloud(d::Discretisation, rvs...)
