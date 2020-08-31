@@ -18,7 +18,83 @@ transverse derivatives.  Those are currently part of this package,
 but the intention is to get rid of them and use a general solution
 as soon as an adequate one becomes available.
 
-## Defaults
+## Units
+
+What GPE this solves
+
+`default(:hbm)` to set hbar/m, but per-`Superfluid` override
+
+Length units are up to you
+
+How to set up a harmonic trap with l₀ and ω₀
+
+## Superfluids
+
+Optional (ψ₀, discretisation) pair
+
+Potential can be a function, or a (V, discretisation) pair
+
+## Rotating frames
+
+A `Superfluid` can have a rotation rate, but this can be overridden by the `Ω` keyword argument.
+
+## Discretisations
+
+Finite difference, what's supported
+
+Fourier spectral
+
+### Wave functions
+
+Everything is normalised with norm(q) = 1, no cleverness about discretisation.
+
+### Operators
+
+These scale with h to keep repulsion consistent
+
+### Interpolation
+
+Interpolating between discretisations
+
+Interpolating time series between Superfluids with different hbm
+
+Plotting automatically interpolates
+
+## Loading and saving
+
+Structure with source code, defaults, 
+
+## Steady state relaxation
+
+`steady_state` for TF cloud
+
+`steady_state` for pinned vortices
+
+Relaxing vortex positions with fixed rotation frequency
+
+Finding a frequency where a set lattice is steady
+
+## GPE dynamics
+
+The `solve` function.  Easy.
+
+Plotting dynamics gives an animation: `plot(::Discretisation{N}, ts, ψs)'.  Where `ψs` can be an `N+1` array, or a vector of `N` arrays. 
+
+## Bogoliubov de-Gennes modes
+
+The matrix functions
+
+Normalisation with `norm2(u)-norm2(v) == 1`.
+
+Plotting a mode set to give J vs ω
+
+Animating modes
+
+## Parameters
+
+Which `Optim` parameters can be passed on
+
+Which `DifferentialEquations` parameters
 
 Almost every function in the Superfluids library must be passed a
 `Superfluid`, or at least a `Discretisation`.  To avoid unnecessary
@@ -36,7 +112,10 @@ Other arguments are in the same boat:
 
 * `dt`  The time step for solving the GPE
 
+# Internals
 
-## Wave functions
+How the vortex detector works
 
-Everything is normalised with norm(q) = 1, no cleverness about discretisation.
+How the vortex pinning works
+
+Structured BdG matrices

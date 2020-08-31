@@ -76,7 +76,7 @@ function relax_orbit(s, d, r; Ωs, g_tol, iterations)
         μ = dot(L(q), q)
         norm(L(q)-μ*q)
     end
-    Ω = optimize(residual, Ωs...).minimizer
+    Ω = optimize(residual, Ωs..., abs_tol=g_tol).minimizer
     Ω, relax_field(s,d,r, Ω; g_tol, iterations)
 end
 
