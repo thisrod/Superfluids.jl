@@ -20,6 +20,11 @@ struct FDDiscretisation{N} <: Discretisation{N}
     end
 end
 
+# Maximum domain size l, limit maximum V to nyquist T
+FDDiscretisation(s::Superfluid{N}, n, l=Inf) where N =
+    FDDiscretisation{N}(n, min(l/(n+1), sqrt(√2*π/n)))
+FDDiscretisation(n, l) = FDDiscretisation(default(:superfluid), n, l)
+
 function D(u, j, d::FDDiscretisation, n)
     if j == 1
         d.Ds[n]*u
@@ -29,11 +34,6 @@ function D(u, j, d::FDDiscretisation, n)
         error("NYI")
     end
 end
-
-# Maximum domain size l, limit maximum V to nyquist T
-FDDiscretisation(s::Superfluid{N}, n, l) where N =
-    FDDiscretisation{N}(n, min(l/(n+1), sqrt(√2*π/n)))
-FDDiscretisation(n, l) = FDDiscretisation(default(:superfluid), n, l)
 
 function op(n, stencil)
     mid = (length(stencil)+1)÷2
@@ -45,7 +45,7 @@ function operators(s::Superfluid{2}, d::FDDiscretisation{2}, syms::Vararg{Symbol
     x, y = d.xyz
     V = sample(s.V, d)
     
-    T(ψ) = -(D(ψ,1,d,2)+D(ψ,2,d,2))/2
+    T(ψ) = -s.hbm*(D(ψ,1,d,2)+D(ψ,2,d,2))/2
     U(ψ) = s.C/d.h*abs2.(ψ)
     J(ψ) = -1im*(x.*D(ψ,2,d)-y.*D(ψ,1,d))
     L(ψ) = T(ψ)+(V+U(ψ)).*ψ
@@ -83,3 +83,17 @@ function matrices(s::Superfluid{2}, d::FDDiscretisation{2}, Ω, ψ, syms::Vararg
 end
 
 sample(f, d::FDDiscretisation) = f.(d.xyz...)
+
+"""
+    interpolate(d, ψ)
+
+Return a function that interpolates ψ on (x,y) or z
+
+TODO Make this consistent with the FD interpolants
+"""
+function interpolate(d::FDDiscretisation{2}, q)
+    xs = d.h/2*(1-d.n:2:d.n-1)
+    f = Interpolations.CubicSplineInterpolation((xs, xs), q/d.h)
+    g(x,y) = f(x,y)
+    g(z) = f(real(z), imag(z))
+end

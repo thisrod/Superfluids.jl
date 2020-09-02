@@ -1,14 +1,27 @@
 module Superfluids
 
-export Superfluid, Discretisation, FDDiscretisation, PinnedVortices, discretise, argand, cloud, steady_state, sample, find_vortex, relax_field, relax_orbit
+export Superfluid, Discretisation, FDDiscretisation, PinnedVortices, discretise, argand, cloud, relaxed_state, sample, find_vortex, relax_orbit
 using LinearAlgebra, BandedMatrices, Optim, Arpack
 using Statistics: mean
+import DifferentialEquations, Interpolations
+
 
 # Default parameters
 
-_defaults = Dict{Symbol,Any}(:g_tol=>1e-4, :iterations=>1000)
 default(k::Symbol) = get(_defaults, k, nothing)
-default!(k::Symbol, v) = _defaults[k] = v
+default() = copy(_defaults)
+default!(k::Symbol, v) = (_defaults[k] = v; nothing)
+default!(d::Dict{Symbol,Any}) = (_defaults=copy(d); nothing)
+
+_defaults = Dict{Symbol,Any}(
+    :hbm=>1,
+    :g_tol=>1e-6,
+    :iterations=>1000,
+    :dt=>1e-4,
+    :relaxer=>Optim.ConjugateGradient,
+    :formula=>DifferentialEquations.RK4,
+    :solver=>nothing	# eigenproblem solver
+)
       
 
 """
@@ -18,10 +31,12 @@ N-dimensional superfluid
 """
 struct Superfluid{N}
     C::Float64				# repulsion constant
+    hbm::Float64
     V				# (x,y) -> V
 end
 
-Superfluid{N}(C::Float64) where N = Superfluid{N}(C, (x...) -> 0.0)
+Superfluid{N}(C::Real, V=(x...)->0.0; hbm::Real=default(:hbm)) where N =
+    Superfluid{N}(convert(Float64, C), convert(Float64, hbm), V)
 
 default!(v::Superfluid) = default!(:superfluid, v)
 

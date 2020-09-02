@@ -1,4 +1,4 @@
-# Vortex detection
+# Vortex detection and imprinting
 
 """
     P, Q = poles(u)
@@ -99,3 +99,56 @@ function box(cixs::AbstractVector{CartesianIndex{2}})
 end
 
 box(ixs::AbstractMatrix{Bool}) = box(keys(ixs)[ixs])
+
+
+"""
+    PinnedVortices([s], [d], rv...) <: Optim.Manifold
+
+Constrain a field to have vortices centred at the rvs
+
+Sampling at the grid points around each rv, let o be the component
+of 1 that is orthogonal to (z-rv), and zero on the rest of the grid.
+The space orthogonal to every o comprises the fields with a vortex
+at every rv (and maybe at other points too).
+"""
+struct PinnedVortices <: Manifold
+   ixs::Matrix{Int}		# 2D array, column of indices for each vortex
+   U::Matrix{Complex{Float64}}		# U[i,j] is a coefficient for z[ixs[i,j]]
+   function PinnedVortices(d::Discretisation, rvs::Vararg{Complex{Float64}})
+        z = argand(d)
+        ixs = Array{Int}(undef, 4, length(rvs))
+        U = ones(eltype(z), size(ixs))
+        for (j, rv) = pairs(rvs)
+            ixs[:,j] = sort(eachindex(z), by=k->abs(z[k]-rv))[1:4]
+            a = normalize(z[ixs[:,j]].-rv)
+            U[:,j] .-= a*(a'*U[:,j])
+            # Orthonormalise as we go
+            # TODO test and uncomment this
+            # TODO check for which order Gram-Schmidt is stable
+            # Although these are only parallel if two vortices are within a pixel
+#             for k = 1:j
+#                 a = zeros(eltype(z), 4)
+#                 for m = 1:4
+#                     n = findfirst(isequal(ixs[m,j]), ixs[:,k])
+#                     isnothing(n) || (a[n] = U[n,k])
+#                 end
+#                 U[:,j] .-= a*(a'*U[:,j])
+#             end
+            U[:,j] = normalize(U[:,j])
+        end
+        new(ixs, U)
+   end
+end
+
+function prjct!(M, q)
+    for j = 1:size(M.ixs,2)
+        q[M.ixs[:,j]] .-= M.U[:,j]*(M.U[:,j]'*q[M.ixs[:,j]])
+    end
+    q
+end
+
+# The "vortex at R" space is invariant under normalisation
+Optim.retract!(M::PinnedVortices, q) =
+    Optim.retract!(Sphere(), prjct!(M, q))
+Optim.project_tangent!(M::PinnedVortices, dq, q) =
+    Optim.project_tangent!(Sphere(), prjct!(M, dq),q)
