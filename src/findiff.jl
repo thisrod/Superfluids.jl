@@ -41,20 +41,17 @@ function op(n, stencil)
     BandedMatrix(Tuple(diags), (n,n))
 end
 
-function operators(s::Superfluid{2}, d::FDDiscretisation{2}, syms::Vararg{Symbol})
+"""
+    Δ, U, J = operators(Discretisation)
+"""
+function operators(d::FDDiscretisation{2})
     x, y = d.xyz
-    V = sample(s.V, d)
     
-    T(ψ) = -s.hbm*(D(ψ,1,d,2)+D(ψ,2,d,2))/2
-    U(ψ) = s.C/d.h*abs2.(ψ)
+    Δ(ψ) = D(ψ,1,d,2)+D(ψ,2,d,2)
+    # ψ is normalised as a number, so the density is ψ/h^N
+    U(ψ) = @. abs2(ψ)/d.h^2*ψ
     J(ψ) = -1im*(x.*D(ψ,2,d)-y.*D(ψ,1,d))
-    L(ψ) = T(ψ)+(V+U(ψ)).*ψ
-    L(ψ,Ω) = L(ψ)-Ω*J(ψ)
-    H(ψ) = T(ψ)+(V+U(ψ)/2).*ψ
-    H(ψ,Ω) = H(ψ)-Ω*J(ψ)
-    
-    ops = Dict(:V=>V, :T=>T, :U=>U, :J=>J, :L=>L, :H=>H)
-    isempty(syms) ? ops : [ops[j] for j in syms]
+    Δ, U, J
 end
 
 """

@@ -66,14 +66,28 @@ Return the nth derivative of the field u
 D(u, axis, d::Discretisation) = D(u, axis, d, 1)
 
 """
-    operators(s::Superfluid, d::Discretisation, syms...)
+    L, H, T, V = operators(s::Superfluid, d::Discretisation)
 
 Return operator functions that act on sample(ψ, d)
 
-By default returns a dictionary, with symbols returns those operators.
+TODO specify which operators are returned when s and d are missing
+
+TODO does s.hbm affect J?  Presumably not after we divide by hbar
 """
-function operators(s::Superfluid, d::Discretisation) end
-operators(syms::Vararg{Symbol}) =
+function operators(s::Superfluid, d::Discretisation)
+    Δ, U, J = operators(d)
+    W = sample(s.V, d)
+    V(ψ) = W.*ψ
+    
+    T(ψ) = -s.hbm/2*Δ(ψ)
+    L(ψ) = T(ψ)+V(ψ)+s.C*U(ψ)
+    L(ψ,Ω) = L(ψ)-Ω*J(ψ)
+    H(ψ) = T(ψ)+V(ψ)+s.C/2*U(ψ)
+    H(ψ,Ω) = H(ψ)-Ω*J(ψ)
+    L, H, T, V
+end
+
+operators() =
     operators(default(:superfluid), default(:discretisation), syms...)
 operators(s::Superfluid, syms::Vararg{Symbol}) =
     operators(s, default(:discretisation), syms...)
@@ -93,5 +107,6 @@ include("plotting.jl")
 include("vortices.jl")
 include("relaxation.jl")
 include("bogoliubov.jl")
+include("dynamics.jl")
 
 end # module

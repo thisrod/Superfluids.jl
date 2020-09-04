@@ -46,7 +46,7 @@ function relax(s::Superfluid{2},
         iterations=default(:iterations)
     )
     
-    L, H = operators(s, d, :L, :H)
+    L, H, _, _ = operators(s, d)
     Optim.optimize(
         ψ -> dot(ψ,H(ψ,Ω)) |> real,
         (buf,ψ) -> copyto!(buf, 2*L(ψ,Ω)),
@@ -90,7 +90,7 @@ inelegant.
 function relax_orbit(s, d, r; Ωs, g_tol, iterations)
     #TODO Convergence parameters for optimize
     r = Complex{Float64}[r]
-    L = only(operators(s, d, :L))
+    L = first(operators(s, d))
     function residual(Ω)
         q = relax_field(s,d,r, Ω; g_tol, iterations)
         μ = dot(L(q), q)

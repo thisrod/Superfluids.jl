@@ -23,20 +23,33 @@
 # 
 # The Gross-Pitaevskii equation, divided by ``\hbar`` to make every term a rate of change, is
 # ```math
-# i\psi_t = \left({1\over2}{\hbar\over m}\nabla^2 + {V\over\hbar} +
+# i\psi_t = \left(-{1\over2}{\hbar\over m}\nabla^2 + {V\over\hbar} +
 #     {C\over\hbar}|\psi|^2\right)\psi.
 # ```
 # (V is a "trap" potential, "C" a repulsion constant, normalisation is described below.)
 # 
-# For numerical purposes, the factors of 2 are an unsettled matter of taste.  Therefore the package provides a parameter `:hbm` for the user to set to ``\hbar/m`` in the unit scheme of their choice.  For this manual, we will choose `\hbar=m`.
+# For numerical purposes, the factors of 2 are an unsettled matter
+# of taste.  Therefore the package provides a parameter `:hbm` for
+# the user to set to ``\hbar/m`` in the unit scheme of their choice.
 
 using Superfluids
 Superfluids.default!(:hbm, 1)
 
-# When ``\hbar/m`` is made dimensionless, time is identified with area, according to the quadratic dispersion relation for de Broglie waves.
+# When ``\hbar/m`` is made dimensionless, time is identified with
+# area, according to the quadratic dispersion relation for de Broglie
+# waves.
 # 
-# In the case that ``V={1\over 2}m\omega_0x^2`` is a quadratic potential, a common convention is to define the time unit by ``\omega_0=1``, and use the characteristic trap length ... as a length unit to make V=....  This requires setting `:hbm = ...`, which is the default.
-# 
+# In the case that ``V={1\over 2}m\omega x^2`` is a quadratic
+# potential, a common convention is to define the time unit by
+# ``\omega=1``, and use the characteristic trap length
+# ``\sqrt{\hbar^2/m\omega}`` as a length unit.  With the setting `:hbm
+# = 1`, which is the default and used in this manual, the GPE becomes
+# ```math
+# i\psi_t = {1\over2}\left(-\nabla^2 + x^2 +
+#     {\rm something}|\psi|^2\right)\psi.
+# ```
+# TODO explain how ``C`` scales with trap length and dimension.
+#
 # 
 # ## Superfluids
 # 
@@ -144,3 +157,37 @@ Superfluids.default!(:hbm, 1)
 # * Wave functions returned by interpolation are ``L^2`` normalized.
 # 
 # * The tricky bit is ``|\psi|^2`` in ``U(\psi)``, which must be adjusted as if the ``L^2`` norm were 1.
+# 
+# # Roadmap
+# 
+# ## Version 1
+# 
+# * Support low-order FD and Fourier spectral discretisation
+# 
+# * 1D and 2D are feature complete
+# 
+# * 3D is underway
+# 
+# * 1D and 2D are completely documented
+# 
+# * 100% test coverage
+# 
+# ## Version 2
+# 
+# * 3D is feature complete
+# 
+# * Support FD with reasonable stencils
+# 
+# * Julia has a ':LM' iterative solver, and the necessary sparse matrix inverses, for the BdG eigenproblem
+# 
+# * Efficient support for `DiffEqOperators`
+# 
+# ## Future
+# 
+# * Green's function preconditioning
+# 
+# * Dynamics can be solved by GPU
+# 
+# * Fornberg spectral discretisation
+# 
+# * Manage projection and aliasing for phase-space Monte-Carlo

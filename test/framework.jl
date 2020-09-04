@@ -1,10 +1,24 @@
 using Superfluids
-using LinearAlgebra: normalize!, dot, norm
+using LinearAlgebra
 
-s = Superfluid{2}(3000, (x,y) -> x^2+y^2)
-d1 = FDDiscretisation(s, 30)
-d2 = FDDiscretisation(s, 50)
+s = Superfluid{2}(3000, (x,y) -> (x^2+y^2)/2)
 
+
+
+# Test values of discretisation and complex
+
+fuzerate(::Type{Discretisation}) = [
+    FDDiscretisation{2}(30,0.4),
+    FDDiscretisation{2}(30,0.5),
+    FDDiscretisation{2}(50,0.4),
+    FDDiscretisation{2}(50,0.5)
+]
+
+fuzerate(::Type{Complex{Float64}}, n=7) =
+    Complex.(randn(n),randn(n))
+
+
+# Imprinted offset vortex test
 rv = Complex(1.5, 0.3)
 f1(z) = @. exp(-abs2(z)/18)
 f2(z) = @. f1(z)*(z-rv)/√(abs2(z-rv)+1)
@@ -17,11 +31,45 @@ normalize!(q2)
 U1 = Superfluids.operators(s,d1,:U) |> only
 U2 = Superfluids.operators(s,d2,:U) |> only
 
-function interpolate_and_compare(op, q, ds...)
-    zs = Complex.(randn(10),randn(10))
-    
+"f(::Discretisation) = operator, g(z) is wave function"
+function consistent_operator(f, g)
+    zs = fuzerate(Complex{Float64})
+    uzs = []
+    for d = fuzerate(Discretisation)
+        u = f(d)
+        q = g.(argand(d))
+        normalize!(q)
+        uq = Superfluids.interpolate(d, u(q))
+        push!(uzs, uq.(zs))
+    end
+    zs, uzs
 end
+
+
+function sho_error(d)
+    sho = Superfluid{2}(0, (x,y) -> (x^2+y^2)/2)
+    z = argand(d)
+    w = normalize(@. exp(-abs2(z)/2))
+    q = relaxed_state(sho, d)
+    norm(q - w*(w'*q))
+end
+
+"Expectation values of operators in SHO ground state"
+function sho_energies(d)
+    z = argand(d)
+    w = normalize(@. exp(-abs2(z)/2))
+    Δ, U, J = Superfluids.operators(d)
+    Dict(
+        :T=>dot(w,Δ(w)),
+        :U=>dot(w,U(w)),
+        :J=>dot(w,J(w))
+    )
+end
+
+# check energies are (1/2, 0, 1/2) for SHO
 
 # check derivatives of cloud(d)
 
 φ = ground_state(S,D)
+
+zs, us = consistent_operator(d->only(operators(s, d, :U)), f2)
