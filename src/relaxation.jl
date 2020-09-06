@@ -1,7 +1,7 @@
 # Rotating frame relaxation of vortex orbits and lattices
 
 """
-    relaxed_state([s], [d]; Ω=0, rvs=[], initial, [Optim args])
+    steady_state([s], [d]; Ω=0, rvs=[], initial, [Optim args])
 
 Return a relaxed order parameter
 
@@ -17,24 +17,24 @@ should actually have vortices at the pinned locations.
 
 See also: relax
 """
-function relaxed_state(s::Superfluid, d::Discretisation; args...)
+function steady_state(s::Superfluid, d::Discretisation; args...)
     result = relax(s, d; args...)
     Optim.converged(result) || error("Order parameter failed to converge")
     result.minimizer
 end
 
-relaxed_state(;args...) =
-    relaxed_state(default(:superfluid), default(:discretisation); args...)
-relaxed_state(s::Superfluid; args...) =
-    relaxed_state(s, default(:discretisation); args...)
-relaxed_state(d::Discretisation; args...) =
-    relaxed_state(default(:superfluid), d; args...)
+steady_state(;args...) =
+    steady_state(default(:superfluid), default(:discretisation); args...)
+steady_state(s::Superfluid; args...) =
+    steady_state(s, default(:discretisation); args...)
+steady_state(d::Discretisation; args...) =
+    steady_state(default(:superfluid), d; args...)
        
 
 """
     relax([s], [d]; Ω=0, rvs=[], initial, [Optim args])
 
-Return an Optim result whose minimizer is `relaxed_state`
+Return an Optim result whose minimizer is `steady_state`
 """
 function relax(s::Superfluid{2},
         d::Discretisation{2};
@@ -74,6 +74,21 @@ function cloud(d::FDDiscretisation{2}, rvs::Vararg{Complex{Float64}})
 end
 
 cloud(rvs::Vararg{Complex{Float64}}) = cloud(default(:discretisation), rvs...)
+
+
+"""
+    Ω, q = acquire(steady_state args)
+    
+Find a rotating frame frequency that minimises the residual for the specified vortices
+"""
+
+"""
+    ps, q = relax_lattice(f, s, d, Ω, ps)
+
+Optimise ps to find a steady lattice in the rotating frame
+
+The lattice has vortices at `f(ps)`.
+"""
 
 
 """

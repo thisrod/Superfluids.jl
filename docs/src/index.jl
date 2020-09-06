@@ -69,6 +69,8 @@ Superfluids.default!(:hbm, 1)
 # 
 # Fourier spectral
 # 
+# Complex coordinates in the Argand plane (quaternions in 3D?)
+# 
 # ### Wave functions
 # 
 # Everything is normalised with norm(q) = 1, no cleverness about discretisation.
@@ -95,6 +97,15 @@ Superfluids.default!(:hbm, 1)
 # 
 # `steady_state` for pinned vortices
 # 
+# ## Vortices and solitons
+# 
+# In 1D, soliton locations are specified as a vector of real numbers.
+# 
+# In 2D, vortex core locations are a vector of pairs or complex numbers.
+# 
+# TODO figure out how to specify vortex lines in 3D (and soliton lines in 2D, if they exist)
+# 
+# # 
 # Relaxing vortex positions with fixed rotation frequency
 # 
 # Finding a frequency where a set lattice is steady
@@ -139,9 +150,19 @@ Superfluids.default!(:hbm, 1)
 # 
 # # Internals
 # 
-# How the vortex detector works
+# ## The discretisation interface
 # 
-# How the vortex pinning works.  General idea: ψ(r_v) = 0 + ∇(r_v)[dψ]
+# A discretised wave function is an array.  A normalised wave function should correspond to a normalised array, i.e. absorb the quadrature weights into the coefficients.
+# 
+# `primitive_operators`
+# 
+# `sample`
+# 
+# TODO how do vortices work with general discretisatons?  Presumably a function that takes `rv`, and returns the dual vector q -> ψ(rv).
+# 
+# # ## How the vortex detector works
+# 
+# ## How the vortex pinning works.  General idea: ψ(r_v) = 0 + ∇(r_v)[dψ]
 # + O(dψ²).  Project dψ onto the null space of J.  Retraction is a
 # multivariate optimization in concept, but one step in direction
 # -∇(rv) works in practice.
@@ -164,17 +185,17 @@ Superfluids.default!(:hbm, 1)
 # 
 # * Support low-order FD and Fourier spectral discretisation
 # 
-# * 1D and 2D are feature complete
+# * 1D and 2D are feature complete and documented
 # 
-# * 3D is underway
-# 
-# * 1D and 2D are completely documented
+# * 3D with vortices is underway
+#
+# * Multiple components are documented
 # 
 # * 100% test coverage
 # 
 # ## Version 2
 # 
-# * 3D is feature complete
+# * 3D and multiple components are fully implemented
 # 
 # * Support FD with reasonable stencils
 # 

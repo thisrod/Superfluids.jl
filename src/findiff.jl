@@ -41,15 +41,12 @@ function op(n, stencil)
     BandedMatrix(Tuple(diags), (n,n))
 end
 
-"""
-    Δ, U, J = operators(Discretisation)
-"""
-function operators(d::FDDiscretisation{2})
+function primitive_operators(d::FDDiscretisation{2})
     x, y = d.xyz
     
     Δ(ψ) = D(ψ,1,d,2)+D(ψ,2,d,2)
-    # ψ is normalised as a number, so the density is ψ/h^N
-    U(ψ) = @. abs2(ψ)/d.h^2*ψ
+    # φ is normalised as a number, so the density is φ/h^N
+    U(φ,ψ) = @. abs2(φ)/d.h^2*ψ
     J(ψ) = -1im*(x.*D(ψ,2,d)-y.*D(ψ,1,d))
     Δ, U, J
 end

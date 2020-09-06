@@ -1,6 +1,8 @@
 module Superfluids
 
-export Superfluid, Discretisation, FDDiscretisation, PinnedVortices, discretise, argand, cloud, relaxed_state, sample, find_vortex, relax_orbit
+export Superfluid, Discretisation, FDDiscretisation, PinnedVortices,
+    steady_state, find_vortex, relax_orbit
+
 using LinearAlgebra, BandedMatrices, Optim, Arpack
 using Statistics: mean
 import DifferentialEquations, Interpolations
@@ -66,25 +68,42 @@ Return the nth derivative of the field u
 D(u, axis, d::Discretisation) = D(u, axis, d, 1)
 
 """
-    L, H, T, V = operators(s::Superfluid, d::Discretisation)
+    o1, ... = operators(s::Superfluid, d::Discretisation, s1, ...)
 
-Return operator functions that act on sample(ψ, d)
+Return Gross-Pitaevskii operators specified by symbols
 
-TODO specify which operators are returned when s and d are missing
+Let `u` be a normalised vector, that discretises the normalised
+wave function ``\\psi(x,y,z)``.  The returned functions are selected
+by symbols as follows:
 
-TODO does s.hbm affect J?  Presumably not after we divide by hbar
+* `:L` for the GPE dynamics operator 
+
+* `:H` for the GPE energy operator
+
+* `:T` for the kinetic energy
+
+* `:V` for the trap potential
+
+* `:U` for the nonlinear repulsion
+
+* `:J` for the angular momentum operator
+
+TODO mutating versions
 """
-function operators(s::Superfluid, d::Discretisation)
-    Δ, U, J = operators(d)
-    W = sample(s.V, d)
-    V(ψ) = W.*ψ
+function operators(s::Superfluid, d::Discretisation, syms::Vararg{Symbol})
+    Δ, W, J = primitive_operators(d)
+    Vmat = sample(s.V, d)
     
     T(ψ) = -s.hbm/2*Δ(ψ)
-    L(ψ) = T(ψ)+V(ψ)+s.C*U(ψ)
+    V(ψ) = Vmat.*ψ
+    U(φ,ψ) = s.C*W(φ,ψ)
+    U(ψ) = U(ψ,ψ)
+    L(ψ) = T(ψ)+V(ψ)+U(ψ)
     L(ψ,Ω) = L(ψ)-Ω*J(ψ)
-    H(ψ) = T(ψ)+V(ψ)+s.C/2*U(ψ)
+    H(ψ) = T(ψ)+V(ψ)+U(ψ)/2
     H(ψ,Ω) = H(ψ)-Ω*J(ψ)
-    L, H, T, V
+    ops = Dict(:V=>V, :T=>T, :U=>U, :J=>J, :L=>L, :H=>H)
+    [ops[j] for j in syms]
 end
 
 operators() =
@@ -93,6 +112,22 @@ operators(s::Superfluid, syms::Vararg{Symbol}) =
     operators(s, default(:discretisation), syms...)
 operators(d::Discretisation, syms::Vararg{Symbol}) =
     operators(default(:superfluid), d, syms...)
+
+"""
+    Δ, U, J = primitive_operators(d::Discretisation)
+
+Return primitive operators
+
+* `Δ(u)` is the Lagrangian ``\\psi_{xx}+\\psi_{yy}+\\psi_zz``
+
+* `U(v, u)` is the nonlinear repulsion ``|\\phi|^2\\psi``.  This is
+where ``\\phi`` is converted from vector to wave function normalisation.
+
+* `J(u)` is the angular momentum operator ``-i{\\bf r}\\times\\nabla``.
+TODO specify how this works in 2D and 3D.
+"""
+function primitive_operators(::Discretisation) end
+
 
 # argand(d::Discretisation) = sample(Complex, d)
 argand(d::Discretisation) = sample((x,y)->x+1im*y, d)
