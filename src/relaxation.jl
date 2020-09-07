@@ -103,16 +103,14 @@ the steady Ω is to minimize the residual, although this is a bit
 inelegant.
 """
 function relax_orbit(s, d, r; Ωs, g_tol, iterations)
-    #TODO Convergence parameters for optimize
-    r = Complex{Float64}[r]
-    L = first(operators(s, d))
+    L = only(operators(s, d, :L))
     function residual(Ω)
-        q = relax_field(s,d,r, Ω; g_tol, iterations)
-        μ = dot(L(q), q)
-        norm(L(q)-μ*q)
+        q = steady_state(s,d; rvs=Complex{Float64}[r], Ω, g_tol, iterations)
+        μ = dot(L(q,Ω), q)
+        sum(abs2, L(q,Ω)-μ*q)
     end
     Ω = optimize(residual, Ωs..., abs_tol=g_tol).minimizer
-    Ω, relax_field(s,d,r, Ω; g_tol, iterations)
+    Ω, steady_state(s,d; rvs=Complex{Float64}[r], Ω, g_tol, iterations)
 end
 
 PinnedVortices(d::Discretisation, rvs::Vararg{Number}) =

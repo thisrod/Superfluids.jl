@@ -15,6 +15,43 @@ default() = copy(_defaults)
 default!(k::Symbol, v) = (_defaults[k] = v; nothing)
 default!(d::Dict{Symbol,Any}) = (_defaults=copy(d); nothing)
 
+macro defaults(m)
+    # TODO look at types instead of names s and d
+    strip_arg(x::Symbol) = x
+    strip_arg(x) = strip_arg(x.args[1])
+            
+    if (m isa Expr && 
+            m.head in [:(=), :function] &&
+            m.args[1].head == :call)
+        "foo"
+    else
+        error("Not a method definition")
+    end
+    f = m.args[1].args[1]
+    ps = m.args[1].args[2:end]
+    qs = strip_arg.(ps)
+    if length(ps) ≥ 2 && ps[1] == :s && ps[2] == :d
+        quote
+            $f($(ps[3:end]...)) = $f(default(:superfluid), default(:discretisation), $(qs[3:end]...))
+            $f(s::Superfluid, $(ps[3:end]...)) = $f(s, default(:discretisation), $(qs[3:end]...))
+            $f(d::Discretisation, $(ps[3:end]...)) = $f(default(:superfluid), d, $(qs[3:end]...))
+            $m
+        end
+    elseif length(ps) ≥1 && ps[1] == :s
+        quote
+            $f($(ps[2:end]...)) = $f(default(:superfluid), $(qs[2:end]...))
+            $m
+        end
+    elseif length(ps) ≥1 && ps[1] == :d
+        quote
+            $f($(ps[2:end]...)) = $f(default(:discretisation), $(qs[2:end]...))
+            $m
+        end
+    else
+        m
+    end
+end
+
 _defaults = Dict{Symbol,Any}(
     :hbm=>1,
     :g_tol=>1e-6,
@@ -24,6 +61,11 @@ _defaults = Dict{Symbol,Any}(
     :formula=>DifferentialEquations.RK4,
     :solver=>nothing	# eigenproblem solver
 )
+
+const OPT_ARGS = (:g_tol, :iterations, :relaxer)
+const DIFEQ_ARGS = (:dt, :formula)
+
+
       
 
 """
