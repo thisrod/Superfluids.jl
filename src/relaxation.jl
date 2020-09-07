@@ -46,7 +46,7 @@ function relax(s::Superfluid{2},
         iterations=default(:iterations)
     )
     
-    L, H, _, _ = operators(s, d)
+    L, H = operators(s, d, :L, :H)
     Optim.optimize(
         ψ -> dot(ψ,H(ψ,Ω)) |> real,
         (buf,ψ) -> copyto!(buf, 2*L(ψ,Ω)),

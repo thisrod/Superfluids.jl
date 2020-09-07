@@ -32,7 +32,7 @@ function BdGmatrix(s, d, Ω, ψ)
     μ = UniformScaling(real(dot(ψ, L(ψ))))
     T, V, J, U, QQ, PP = [
         LinearMap{Complex{Float64}}(apop(A), d.n^2) for
-            A = t, v, j, u, qq, pp
+            A = [t, v, j, u, qq, pp]
     ]
         
     [
