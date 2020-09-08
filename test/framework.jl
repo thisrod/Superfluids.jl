@@ -1,5 +1,6 @@
 using Superfluids
 using LinearAlgebra
+using Superfluids: D
 
 s = Superfluid{2}(3000, (x,y) -> (x^2+y^2)/2)
 

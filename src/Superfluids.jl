@@ -15,6 +15,7 @@ default() = copy(_defaults)
 default!(k::Symbol, v) = (_defaults[k] = v; nothing)
 default!(d::Dict{Symbol,Any}) = (_defaults=copy(d); nothing)
 
+# define methods for default superfluid and discretisation
 macro defaults(m)
     # TODO look at types instead of names s and d
     strip_arg(x::Symbol) = x
@@ -58,14 +59,12 @@ _defaults = Dict{Symbol,Any}(
     :iterations=>1000,
     :dt=>1e-4,
     :relaxer=>Optim.ConjugateGradient,
-    :formula=>DifferentialEquations.RK4,
-    :solver=>nothing	# eigenproblem solver
+    :integrator=>DifferentialEquations.RK4,
+    :diagonizer=>nothing	# eigenproblem solver
 )
 
 const OPT_ARGS = (:g_tol, :iterations, :relaxer)
 const DIFEQ_ARGS = (:dt, :formula)
-
-
       
 
 """
@@ -84,6 +83,7 @@ Superfluid{N}(C::Real, V=(x...)->0.0; hbm::Real=default(:hbm)) where N =
 
 default!(v::Superfluid) = default!(:superfluid, v)
 
+
 """
     abstract type Discretisation{N}
 
@@ -93,6 +93,7 @@ abstract type Discretisation{N} end
 Discretisation() = default(:discretisation)
 default!(v::Discretisation) = default!(:discretisation, v)
 
+
 """
     sample(f, d::Discretisation)
 
@@ -101,6 +102,8 @@ Return an array discretising the function f.
 For now we assume that L² normalised functions give l² normalised arrays.
 """
 function sample(f, d::Discretisation) end
+sample(f) = sample(f, Discretisation())
+
 
 """
     D(u, axis, d::Discretisation, n=1)

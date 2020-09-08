@@ -1,13 +1,13 @@
 # The time-dependent GPE
 
 """
-    solve(s, d, ψ₀, (t0, t1); μ, dt, saveat)
+    integrate(s, d, ψ₀, (t0, t1); μ, dt, saveat)
 
 Return a solution to the GPE
 
 The state at t=0 is ψ₀, ts is a pair of start and stop times.
 """
-function solve(s, d, ψ₀, ts; μ=nothing, dt=default(:dt), saveat=nothing)
+function integrate(s, d, ψ₀, ts; μ=nothing, dt=default(:dt), saveat=nothing)
     # TODO figure out saveat interface
     L = operators(s, d, :L) |> only
     isnothing(μ) && (μ = real(dot(L(ψ₀), ψ₀)))

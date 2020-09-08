@@ -67,7 +67,7 @@ function matrices(s::Superfluid{2}, d::FDDiscretisation{2}, Ω, ψ, syms::Vararg
     ρ = diagm(0=>abs2.(ψ[:]))
     
     T = -kron(eye, ∂²)/2 - kron(∂², eye)/2
-    U = s.C/d.h*ρ
+    U = s.C/d.h^2*ρ
     J = -1im*(repeat(x,1,d.n)[:].*kron(∂,eye)-repeat(y,d.n,1)[:].*kron(eye,∂))
     L = T+V+U-Ω*J
     H = T+V+U/2-Ω*J
