@@ -41,8 +41,12 @@ Check zero mode for BdGmat
         l = d.h*(d.n+1)
         u = cloud(d)
         @test D(u, 1, d, 2) ≈ -(π/l)^2*u
-        @test D((D(u, 1, d), 1, d) ≈ D(u, 1, d, 2)
+        @test D(D(u, 1, d), 1, d) ≈ D(u, 1, d, 2)
         @test D(u, 2, d, 2) ≈ -(π/l)^2*u
-        @test D((D(u, 2, d), 2, d) ≈ D(u, 2, d, 2)
+        @test D(D(u, 2, d), 2, d) ≈ D(u, 2, d, 2)
     end
+end
+
+@testset "Primitive operators" begin
+
 end

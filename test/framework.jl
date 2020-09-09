@@ -1,6 +1,6 @@
 using Superfluids
 using LinearAlgebra
-using Superfluids: D
+using Superfluids: D, argand, cloud
 
 s = Superfluid{2}(3000, (x,y) -> (x^2+y^2)/2)
 
@@ -19,18 +19,18 @@ fuzerate(::Type{Complex{Float64}}, n=7) =
     Complex.(randn(n),randn(n))
 
 
-# Imprinted offset vortex test
-rv = Complex(1.5, 0.3)
-f1(z) = @. exp(-abs2(z)/18)
-f2(z) = @. f1(z)*(z-rv)/√(abs2(z-rv)+1)
-
-q1 = f2.(argand(d1))
-normalize!(q1)
-q2 = f2.(argand(d2))
-normalize!(q2)
-
-U1 = Superfluids.operators(s,d1,:U) |> only
-U2 = Superfluids.operators(s,d2,:U) |> only
+# # Imprinted offset vortex test
+# rv = Complex(1.5, 0.3)
+# f1(z) = @. exp(-abs2(z)/18)
+# f2(z) = @. f1(z)*(z-rv)/√(abs2(z-rv)+1)
+# 
+# q1 = f2.(argand(d1))
+# normalize!(q1)
+# q2 = f2.(argand(d2))
+# normalize!(q2)
+# 
+# U1 = Superfluids.operators(s,d1,:U) |> only
+# U2 = Superfluids.operators(s,d2,:U) |> only
 
 "f(::Discretisation) = operator, g(z) is wave function"
 function consistent_operator(f, g)
@@ -71,6 +71,6 @@ end
 
 # check derivatives of cloud(d)
 
-φ = ground_state(S,D)
-
-zs, us = consistent_operator(d->only(operators(s, d, :U)), f2)
+# φ = ground_state(S,D)
+# 
+# zs, us = consistent_operator(d->only(operators(s, d, :U)), f2)

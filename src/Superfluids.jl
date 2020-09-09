@@ -106,11 +106,14 @@ sample(f) = sample(f, Discretisation())
 
 
 """
-    D(u, axis, d::Discretisation, n=1)
+    dif!(y, d, a, u; axis)
+    dif2!(y, d, a, u; axis)
 
-Return the nth derivative of the field u
+Derivatives in axpy form
+
+Add `a .* u_axis` to y in place.
 """
-D(u, axis, d::Discretisation) = D(u, axis, d, 1)
+function dif! end
 
 """
     o1, ... = operators(s::Superfluid, d::Discretisation, s1, ...)
@@ -133,43 +136,72 @@ by symbols as follows:
 
 * `:J` for the angular momentum operator
 
-TODO mutating versions
+The `L` and `H` operators accept a `Ω` keyword argument, which
+evaluates them in a rotating frame.  The nonlinear `L`, `H` and `U`
+operators have a two-argument version, which is linear in the second
+argument.
+
+All operators have mutating versions.  For `L!` and `H!`, these are
+the usual type, `L!(y, u, v; Ω)`.  The others, `V!`, `T!`, `U!` and
+`J!`, are in axpy form.  E.g, `T!(y,u)` adds `T(u)` to `y` in place,
+similarly `V!`.  A scalar `a` is provided to `U!(y,a,v,u)` to add
+`a*U(v,u)`, similarly with `J!(y,a,u)`.
+
+TODO DiscretisedSuperfluid memoizes the operators, can record an order
+parameter.  `discretise!`
 """
+function operators end
+
 function operators(s::Superfluid, d::Discretisation, syms::Vararg{Symbol})
-    Δ, W, J = primitive_operators(d)
+    # TODO does primitive_operators need @inline?
+    Δ!, W!, J! = primitive_operators(d)
     Vmat = sample(s.V, d)
     
-    T(ψ) = -s.hbm/2*Δ(ψ)
-    V(ψ) = Vmat.*ψ
-    U(φ,ψ) = s.C*W(φ,ψ)
-    U(ψ) = U(ψ,ψ)
-    L(ψ) = T(ψ)+V(ψ)+U(ψ)
-    L(ψ,Ω) = L(ψ)-Ω*J(ψ)
-    H(ψ) = T(ψ)+V(ψ)+U(ψ)/2
-    H(ψ,Ω) = H(ψ)-Ω*J(ψ)
-    ops = Dict(:V=>V, :T=>T, :U=>U, :J=>J, :L=>L, :H=>H)
+    V!(y,u) = (@. y += Vmat*u; y)
+    U!(y,a,v,u=v) = W!(y, s.C*a, v, u)
+    T!(y,u) = Δ!(y,-s.hbm/2,u)
+    L!(y,v,u=v; Ω=0) = LH!(y,v,u,Ω,1)
+    H!(y,v,u=v; Ω=0) = LH!(y,v,u,Ω,1/2)
+    
+    function LH!(y, u, v, Ω, c)
+        y .= 0
+        T!(y,u)
+        V!(y,u)
+        U!(y,c,v,u)
+        J!(y,-Ω,u)
+    end
+    
+    T(u) = T!(zero(u),u)
+    V(u) = V!(zero(u),u)
+    J(u) = J!(zero(u),1,u)
+    U(v, u=v) = U!(zero(u),1,v,u)
+    L(v, u=v; Ω=0) = L!(similar(u), u, v; Ω)
+    H(v, u=v; Ω=0) = H!(similar(u), u, v; Ω)
+    
+    # Return those requested
+    ops = Dict(
+        :V=>V, :T=>T, :U=>U, :J=>J, :L=>L, :H=>H,
+        :V! =>V!, :T! =>T!, :U! =>U!, :J! =>J!, :L! =>L!, :H! =>H!
+    )
     [ops[j] for j in syms]
 end
 
-operators() =
-    operators(default(:superfluid), default(:discretisation), syms...)
-operators(s::Superfluid, syms::Vararg{Symbol}) =
-    operators(s, default(:discretisation), syms...)
-operators(d::Discretisation, syms::Vararg{Symbol}) =
-    operators(default(:superfluid), d, syms...)
 
 """
-    Δ, U, J = primitive_operators(d::Discretisation)
+    Δ!, U!, J! = primitive_operators(d::Discretisation)
 
 Return primitive operators
 
-* `Δ(u)` is the Lagrangian ``\\psi_{xx}+\\psi_{yy}+\\psi_zz``
+The operators are mutating axpy forms, such that `J!(y,a,u)` adds `a*J(u)` to `y`.
 
-* `U(v, u)` is the nonlinear repulsion ``|\\phi|^2\\psi``.  This is
+* `Δ!(y, a, u)` is the Lagrangian ``\\psi_{xx}+\\psi_{yy}+\\psi_zz``
+
+* `U!(y, a, v, u)` is the nonlinear repulsion ``|\\phi|^2\\psi``.  This is
 where ``\\phi`` is converted from vector to wave function normalisation.
 
-* `J(u)` is the angular momentum operator ``-i{\\bf r}\\times\\nabla``.
-TODO specify how this works in 2D and 3D.
+* `J!(y, a, u)` is the angular momentum operator ``-i{\\bf r}\\times\\nabla``.
+
+TODO specify how `J` works in 2D and 3D.
 """
 function primitive_operators(::Discretisation) end
 

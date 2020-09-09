@@ -21,17 +21,21 @@ struct FDDiscretisation{N} <: Discretisation{N}
 end
 
 # Maximum domain size l, limit maximum V to nyquist T
+# TODO update to take maximum V, account for hbm
 FDDiscretisation(s::Superfluid{N}, n, l=Inf) where N =
     FDDiscretisation{N}(n, min(l/(n+1), sqrt(√2*π/n)))
 FDDiscretisation(n, l) = FDDiscretisation(default(:superfluid), n, l)
 
-function D(u, j, d::FDDiscretisation, n)
-    if j == 1
-        d.Ds[n]*u
-    elseif j == 2
-        u*d.Ds[n]'
+dif!(y, d::FDDiscretisation{2}, a, u; axis) = D!(y, d, a, u, 1, axis)
+dif2!(y, d::FDDiscretisation{2}, a, u; axis) = D!(y, d, a, u, 2, axis)
+
+function D!(y, d, a, u, n, axis)
+    if axis == 1
+        y .+= a.*(d.Ds[n]*u)
+    elseif axis == 2
+        y .+= a.*(u*d.Ds[n]')
     else
-        error("NYI")
+        error("Non-existent axis")
     end
 end
 
@@ -42,13 +46,16 @@ function op(n, stencil)
 end
 
 function primitive_operators(d::FDDiscretisation{2})
+    # TODO allocation free J! and Δ! interfaces
+    # maybe D is v.*D(u)
+    # use let to allocate storage, but think about thread safety
     x, y = d.xyz
     
-    Δ(ψ) = D(ψ,1,d,2)+D(ψ,2,d,2)
+    Δ!(y, a, u) = (y .+= a*(D(u,1,d,2)+D(u,2,d,2)); y)
     # φ is normalised as a number, so the density is φ/h^N
-    U(φ,ψ) = @. abs2(φ)/d.h^2*ψ
-    J(ψ) = -1im*(x.*D(ψ,2,d)-y.*D(ψ,1,d))
-    Δ, U, J
+    U!(y, a, v, u) = (@. y += a*abs2(v)/d.h^2*u; y)
+    J!(y, a, u) = (y .+= -1im*a*(x.*D(u,2,d)-y.*D(u,1,d)); y)
+    Δ!, U!, J!
 end
 
 """

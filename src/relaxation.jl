@@ -49,7 +49,7 @@ function relax(s::Superfluid{2},
     L, H = operators(s, d, :L, :H)
     Optim.optimize(
         ψ -> dot(ψ,H(ψ,Ω)) |> real,
-        (buf,ψ) -> copyto!(buf, 2*L(ψ,Ω)),
+        (buf,ψ) -> copyto!(buf, 2*L(ψ;Ω)),
         initial,
         relaxer(manifold=PinnedVortices(d, rvs...)),
         Optim.Options(iterations=iterations, g_tol=g_tol, allow_f_increases=true)

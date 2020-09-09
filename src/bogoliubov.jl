@@ -30,6 +30,21 @@ function BdGmatrix(s, d, Ω, ψ)
     ]
 end
 
+"""
+    ωs, us = hartree_modes(s, d, ψ, n)
+
+Return the lowest `n` hartree eigenfunctions
+"""
+function hartree_modes end
+
+@defaults function hartree_modes(s, d, ψ, n, Ω=0.0)
+    L = operators(s, d, :L) |> only
+    Lop = LinearMap{Complex{Float64}}(d.n^2) do u
+        u = reshape(u, d.n, d.n)
+        L(ψ,u;Ω)[:]
+    end
+end
+
 # function BdGmatrix(s, d, Ω, ψ)
 #     # TODO make this a LinearMap
 #     apop(f) = x->f(reshape(x, d.n, d.n))[:]

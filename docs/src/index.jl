@@ -50,6 +50,7 @@ Superfluids.default!(:hbm, 1)
 # ```
 # TODO explain how ``C`` scales with trap length and dimension.
 #
+# Introduce the static and dynamic GPE and the BdG eigenproblem, explain how they relate.
 # 
 # ## Superfluids
 # 
@@ -94,6 +95,8 @@ Superfluids.default!(:hbm, 1)
 # ## Steady state relaxation
 # 
 # `steady_state` for TF cloud
+# 
+# Mutating forms `steady_state!` etc. that store the order parameter in the superfluid.
 # 
 # `steady_state` for pinned vortices
 # 
