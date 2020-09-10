@@ -1,6 +1,6 @@
-using Superfluids
 using LinearAlgebra
-using Superfluids: D, argand, cloud
+using Superfluids
+using Superfluids: argand, cloud, operators
 
 s = Superfluid{2}(3000, (x,y) -> (x^2+y^2)/2)
 
@@ -48,7 +48,7 @@ end
 
 
 function sho_error(d)
-    sho = Superfluid{2}(0, (x,y) -> (x^2+y^2)/2)
+    s = Superfluid{2}(0, (x,y) -> (x^2+y^2)/2)
     z = argand(d)
     w = normalize(@. exp(-abs2(z)/2))
     q = relaxed_state(sho, d)

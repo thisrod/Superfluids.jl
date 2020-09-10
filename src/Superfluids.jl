@@ -3,7 +3,7 @@ module Superfluids
 export Superfluid, Discretisation, FDDiscretisation, PinnedVortices,
     steady_state, find_vortex, relax_orbit
 
-using LinearAlgebra, BandedMatrices, Optim, Arpack
+using LinearAlgebra, BandedMatrices, LinearMaps, Optim, Arpack
 using Statistics: mean
 import DifferentialEquations, Interpolations
 
@@ -104,8 +104,10 @@ For now we assume that L² normalised functions give l² normalised arrays.
 function sample(f, d::Discretisation) end
 sample(f) = sample(f, Discretisation())
 
+function dif! end
+function dif2! end
 
-"""
+let s = """
     dif!(y, d, a, u; axis)
     dif2!(y, d, a, u; axis)
 
@@ -113,7 +115,9 @@ Derivatives in axpy form
 
 Add `a .* u_axis` to y in place.
 """
-function dif! end
+    @doc s dif!
+    @doc s dif2!
+end
 
 """
     o1, ... = operators(s::Superfluid, d::Discretisation, s1, ...)

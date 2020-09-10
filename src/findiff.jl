@@ -26,6 +26,10 @@ FDDiscretisation(s::Superfluid{N}, n, l=Inf) where N =
     FDDiscretisation{N}(n, min(l/(n+1), sqrt(√2*π/n)))
 FDDiscretisation(n, l) = FDDiscretisation(default(:superfluid), n, l)
 
+Base.show(io::IO, ::MIME"text/plain", d::FDDiscretisation{N}) where N =
+    print(io, "FDDiscretisation{$N}($(d.n), $(d.h))")
+
+
 dif!(y, d::FDDiscretisation{2}, a, u; axis) = D!(y, d, a, u, 1, axis)
 dif2!(y, d::FDDiscretisation{2}, a, u; axis) = D!(y, d, a, u, 2, axis)
 
@@ -46,15 +50,24 @@ function op(n, stencil)
 end
 
 function primitive_operators(d::FDDiscretisation{2})
-    # TODO allocation free J! and Δ! interfaces
-    # maybe D is v.*D(u)
     # use let to allocate storage, but think about thread safety
     x, y = d.xyz
     
-    Δ!(y, a, u) = (y .+= a*(D(u,1,d,2)+D(u,2,d,2)); y)
+    function Δ!(y, a::Number, u)
+        for axis = 1:2
+            dif2!(y, d, a, u; axis)
+        end
+        y
+    end
+    
     # φ is normalised as a number, so the density is φ/h^N
     U!(y, a, v, u) = (@. y += a*abs2(v)/d.h^2*u; y)
-    J!(y, a, u) = (y .+= -1im*a*(x.*D(u,2,d)-y.*D(u,1,d)); y)
+    
+    function J!(y, a::Number, u)
+        dif!(y, d, 1im*a*y, u, axis=1)
+        dif!(y, d, -1im*a*x, u, axis=2)
+    end
+    
     Δ!, U!, J!
 end
 

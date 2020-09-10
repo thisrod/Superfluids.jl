@@ -40,13 +40,55 @@ Check zero mode for BdGmat
     for d = fuzerate(Discretisation)
         l = d.h*(d.n+1)
         u = cloud(d)
-        @test D(u, 1, d, 2) ≈ -(π/l)^2*u
-        @test D(D(u, 1, d), 1, d) ≈ D(u, 1, d, 2)
-        @test D(u, 2, d, 2) ≈ -(π/l)^2*u
-        @test D(D(u, 2, d), 2, d) ≈ D(u, 2, d, 2)
+#         @test D(u, 1, d, 2) ≈ -(π/l)^2*u
+#         @test D(D(u, 1, d), 1, d) ≈ D(u, 1, d, 2)
+#         @test D(u, 2, d, 2) ≈ -(π/l)^2*u
+#         @test D(D(u, 2, d), 2, d) ≈ D(u, 2, d, 2)
     end
 end
 
-@testset "Primitive operators" begin
+# TODO extend fuzerate with a "this is no less converged than the last time the test ran" macro and an order "this test data should converge better than that does"
+
+@testset "SHO ground state expectation values" begin
+    s = Superfluid{2}(0, (x,y) -> (x^2+y^2)/2)
+    for d = fuzerate(Discretisation)
+        T, V, U, J = operators(s,d,:T,:V,:U,:J)
+        z = argand(d)
+        w = similar(z)
+        w .= normalize(@. exp(-abs2(z)/2))
+        @test dot(w,T(w)) ≈ 0.5 atol=0.02
+        @test dot(w,V(w)) ≈ 0.5 atol=0.02
+        @test dot(w,J(w)) ≈ 0.0 atol=1e-10
+        @test dot(w,U(w)) ≈ 0.0
+    end
+end
+
+@testset "SHO ground state is an eigenstate" begin
+    s = Superfluid{2}(0, (x,y) -> (x^2+y^2)/2)
+    for d = fuzerate(Discretisation)
+        L = operators(s,d,:L) |> only
+        z = argand(d)
+        w = similar(z)
+        w .= normalize(@. exp(-abs2(z)/2))
+        @test dot(w,L(w)) ≈ 1.0 atol=0.02
+        @test norm(L(w)-w) < 0.05
+    end
+end
+
+@testset "chemical potential" begin
+    # TODO check this analytically
+    s = Superfluid{2}(500, (x,y) -> (x^2+y^2)/2)
+    for d = fuzerate(Discretisation)
+        L = operators(s,d,:L) |> only
+        q = steady_state(s,d)
+        @test dot(q, L(q)) ≈ 12.678 atol=0.02
+    end
+end
+
+@testset "Hartree BdG matrix compared to explicit form"
+
+end
+
+@testset "Order parameter is zero mode" begin
 
 end
