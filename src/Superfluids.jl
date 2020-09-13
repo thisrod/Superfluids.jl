@@ -1,7 +1,7 @@
 module Superfluids
 
 export Superfluid, Discretisation, FDDiscretisation, PinnedVortices,
-    steady_state, find_vortex, relax_orbit
+    steady_state, find_vortex, relax_orbit, hartree_modes, bdg_modes
 
 using LinearAlgebra, BandedMatrices, LinearMaps, Optim, Arpack
 using Statistics: mean
@@ -142,14 +142,17 @@ by symbols as follows:
 
 The `L` and `H` operators accept a `Ω` keyword argument, which
 evaluates them in a rotating frame.  The nonlinear `L`, `H` and `U`
-operators have a two-argument version, which is linear in the second
-argument.
+operators have a two-argument version, taking a separate density,
+such that `L(ψ) = L(ψ,|ψ|²)`.  This is required for eigenproblems.
+The density can be complex, e.g. in the BdG operator.  The supplied density
+is normalised as a vector, but the operators are evaluated
+with it normalised as a wave function.
 
 All operators have mutating versions.  For `L!` and `H!`, these are
-the usual type, `L!(y, u, v; Ω)`.  The others, `V!`, `T!`, `U!` and
-`J!`, are in axpy form.  E.g, `T!(y,u)` adds `T(u)` to `y` in place,
-similarly `V!`.  A scalar `a` is provided to `U!(y,a,v,u)` to add
-`a*U(v,u)`, similarly with `J!(y,a,u)`.
+the usual type, `L!(u, ρ, ψ; Ω)`.  The others, `V!`, `T!`, `U!` and
+`J!`, are in gaxpy form, e.g,, `T!(u,ψ)` adds `T(ψ)` to `u` in place,
+similarly `V!`.  A scalar `a` is provided to `U!(u,a,ρ,ψ)` to add
+`a*U(ρ,ψ)` to `u`, similarly with `J!(u,a,ψ)`.
 
 TODO DiscretisedSuperfluid memoizes the operators, can record an order
 parameter.  `discretise!`
@@ -161,26 +164,28 @@ function operators(s::Superfluid, d::Discretisation, syms::Vararg{Symbol})
     Δ!, W!, J! = primitive_operators(d)
     Vmat = sample(s.V, d)
     
-    V!(y,u) = (@. y += Vmat*u; y)
-    U!(y,a,v,u=v) = W!(y, s.C*a, v, u)
-    T!(y,u) = Δ!(y,-s.hbm/2,u)
-    L!(y,v,u=v; Ω=0) = LH!(y,v,u,Ω,1)
-    H!(y,v,u=v; Ω=0) = LH!(y,v,u,Ω,1/2)
+    V!(u,ψ) = (@. u += Vmat*ψ; u)
+    U!(u,a,ψ,ρ=abs2.(ψ)) = (W!(u, s.C*a, ρ, ψ); u)
+    T!(u,ψ) = (Δ!(u,-s.hbm/2,ψ); u)
+    L!(u,ψ,ρ=abs2.(ψ); Ω=0) = LH!(u,1,ψ,ρ,Ω)
+    H!(u,ψ,ρ=abs2.(ψ); Ω=0) = LH!(u,1/2,ψ,ρ,Ω)
     
-    function LH!(y, u, v, Ω, c)
-        y .= 0
-        T!(y,u)
-        V!(y,u)
-        U!(y,c,v,u)
-        J!(y,-Ω,u)
+    function LH!(u,a,ψ,ρ,Ω)
+        u .= 0
+        T!(u,ψ)
+        V!(u,ψ)
+        U!(u,a,ψ,ρ)
+        J!(u,-Ω,ψ)
+        u
     end
     
-    T(u) = T!(zero(u),u)
-    V(u) = V!(zero(u),u)
-    J(u) = J!(zero(u),1,u)
-    U(v, u=v) = U!(zero(u),1,v,u)
-    L(v, u=v; Ω=0) = L!(similar(u), u, v; Ω)
-    H(v, u=v; Ω=0) = H!(similar(u), u, v; Ω)
+    T(ψ) = T!(zero(ψ),ψ)
+    V(ψ) = V!(zero(ψ),ψ)
+    # The primitive J! might not return u
+    J(ψ) = (u=zero(ψ); J!(u,1,ψ); u)
+    U(ψ,ρ=abs2.(ψ)) = U!(zero(ψ),1,ψ,ρ)
+    L(ψ,ρ=abs2.(ψ); Ω=0) = L!(similar(ψ), ψ,ρ; Ω)
+    H(ψ,ρ=abs2.(ψ); Ω=0) = H!(similar(ψ), ψ,ρ; Ω)
     
     # Return those requested
     ops = Dict(
@@ -196,14 +201,17 @@ end
 
 Return primitive operators
 
-The operators are mutating axpy forms, such that `J!(y,a,u)` adds `a*J(u)` to `y`.
+The operators are mutating axpy forms, such that `J!(u,a,ψ)` adds
+`a*J(ψ)` to `y`.  These are not required to return `u`.
 
-* `Δ!(y, a, u)` is the Lagrangian ``\\psi_{xx}+\\psi_{yy}+\\psi_zz``
+* `Δ!(u, a, ψ)` is the Lagrangian ``\\psi_{xx}+\\psi_{yy}+\\psi_zz``
 
-* `U!(y, a, v, u)` is the nonlinear repulsion ``|\\phi|^2\\psi``.  This is
-where ``\\phi`` is converted from vector to wave function normalisation.
+* `U!(u, a, ψ, ρ)` is the nonlinear repulsion ``\\rho\\psi``.  This
+is where ``\\rho`` is converted from vector to wave function
+normalisation.  (The `a` constant could be absorbed into `ρ`.  Should
+it be?)
 
-* `J!(y, a, u)` is the angular momentum operator ``-i{\\bf r}\\times\\nabla``.
+* `J!(u, a, ψ)` is the angular momentum operator ``-i{\\bf r}\\times\\nabla``.
 
 TODO specify how `J` works in 2D and 3D.
 """

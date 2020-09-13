@@ -49,6 +49,29 @@ end
 
 # TODO extend fuzerate with a "this is no less converged than the last time the test ran" macro and an order "this test data should converge better than that does"
 
+@testset "Compare operators to explicit matrices" begin
+    d = FDDiscretisation{2}(10, 10/9)
+    s = Superfluid{2}(500, (x,y) -> (x^2+y^2)/2)
+    Ω = rand()
+    # TODO fuzerate wave functions
+    ψ = cloud(d)
+    es = [reshape(e, d.n, d.n)
+        for e = eachcol(Matrix{Complex{Float64}}(I, d.n^2, d.n^2))]
+    
+    function compare(a, f)
+        A = Superfluids.operators(s,d,a) |> only
+        M = Superfluids.matrices(s,d,Ω,ψ,a) |> only
+        @test Superfluids.expand(q->f(A,q),es) ≈ M
+    end
+    
+    compare(:U, (U,q)->U(q,abs2.(ψ)))
+    compare(:L, (L,q)->L(q,abs2.(ψ);Ω))
+    compare(:H, (H,q)->H(q,abs2.(ψ);Ω))
+    compare(:T, (T,q)->T(q))
+    compare(:V, (V,q)->V(q))
+    compare(:J, (J,q)->J(q))
+end
+
 @testset "SHO ground state expectation values" begin
     s = Superfluid{2}(0, (x,y) -> (x^2+y^2)/2)
     for d = fuzerate(Discretisation)
@@ -91,4 +114,20 @@ end
 
 @testset "Order parameter is zero mode" begin
 
+end
+
+@testset "BdG matrix annihilates zero modes"  begin
+    # ew, us = hartree_modes(s, d, ψ, nev, Ω);
+    # Umat = hcat([u[:] for u in us]...);
+    # cs = Umat'*q[:];
+    # ds = conj(cs)
+    # M = Superfluids.BdGmatrix(s, d, Ω, ψ, us)
+    # A = M[1:10, 1:10];
+    # B = M[1:10, 11:20];
+    # C = M[11:20, 1:10];
+    # D = M[11:20, 11:20];
+    # Mu = Umat*(A*cs+B*ds);
+    # Mu = reshape(Mu, d.n, d.n);
+    # Mv = conj(Umat)*(C*cs+D*ds);
+    # Mv = reshape(Mv, d.n, d.n);
 end

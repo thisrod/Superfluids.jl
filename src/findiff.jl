@@ -4,24 +4,30 @@
     FDDiscretisation
 
 Finite difference discretisation on square domain
+
+TODO per-thread scratch space
 """
 struct FDDiscretisation{N} <: Discretisation{N}
     n::Int
     h::Float64			# Axis steps
     Ds
     xyz::NTuple{N,Array{Float64,N}}
+    scratch
     
     function FDDiscretisation{2}(n::Int, h::Float64)
         x = h/2*(1-n:2:n-1)
         x = reshape(x, n, 1)
         Ds = [(1/h).*op(n, Float64[-1/2, 0, 1/2]),
             (1/h^2).*op(n, Float64[1, -2, 1])]
-        new(n, h, Ds, (x,x'))
+        scratch = [Array{Complex{Float64}}(undef, n, n)
+            for j = 1:Threads.nthreads()]
+        new(n, h, Ds, (x,x'), scratch)
     end
 end
 
 # Maximum domain size l, limit maximum V to nyquist T
 # TODO update to take maximum V, account for hbm
+# TODO copy the keyword syntax for Range
 FDDiscretisation(s::Superfluid{N}, n, l=Inf) where N =
     FDDiscretisation{N}(n, min(l/(n+1), sqrt(√2*π/n)))
 FDDiscretisation(n, l) = FDDiscretisation(default(:superfluid), n, l)
@@ -50,22 +56,21 @@ function op(n, stencil)
 end
 
 function primitive_operators(d::FDDiscretisation{2})
-    # use let to allocate storage, but think about thread safety
+    # TODO confirm that using scratch storage this way works
     x, y = d.xyz
     
-    function Δ!(y, a::Number, u)
+    function Δ!(w, a::Number, u)
         for axis = 1:2
-            dif2!(y, d, a, u; axis)
+            dif2!(w, d, a, u; axis)
         end
-        y
     end
     
     # φ is normalised as a number, so the density is φ/h^N
-    U!(y, a, v, u) = (@. y += a*abs2(v)/d.h^2*u; y)
+    U!(w, a, u, r) = (@. w += a*r/d.h^2*u; w)
     
-    function J!(y, a::Number, u)
-        dif!(y, d, 1im*a*y, u, axis=1)
-        dif!(y, d, -1im*a*x, u, axis=2)
+    function J!(w, a::Number, u)
+        dif!(w, d, 1im*a*y, u, axis=1)
+        dif!(w, d, -1im*a*x, u, axis=2)
     end
     
     Δ!, U!, J!
@@ -86,7 +91,7 @@ function matrices(s::Superfluid{2}, d::FDDiscretisation{2}, Ω, ψ, syms::Vararg
     eye = Matrix(I,d.n,d.n)
     ρ = diagm(0=>abs2.(ψ[:]))
     
-    T = -kron(eye, ∂²)/2 - kron(∂², eye)/2
+    T = -s.hbm*kron(eye, ∂²)/2 - s.hbm*kron(∂², eye)/2
     U = s.C/d.h^2*ρ
     J = -1im*(repeat(x,1,d.n)[:].*kron(∂,eye)-repeat(y,d.n,1)[:].*kron(eye,∂))
     L = T+V+U-Ω*J

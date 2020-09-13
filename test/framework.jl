@@ -18,6 +18,18 @@ fuzerate(::Type{Discretisation}) = [
 fuzerate(::Type{Complex{Float64}}, n=7) =
     Complex.(randn(n),randn(n))
 
+struct WaveFunction{N} end
+
+function fuzerate(::Type{WaveFunction{2}}) = [
+    (x,y) -> exp(-abs2(Complex(x,y))/2)),
+    (x,y) -> x*exp(-abs2(Complex(x,y))/2)),
+    (x,y) -> y*exp(-abs2(Complex(x,y))/2)),
+    (x,y) -> (y+2im*x)*exp(-abs2(Complex(x,y))/2)),
+    (x,y) -> (y+2im*x)*exp(-abs2(Complex(x,y))/2)),
+    (x,y) -> (y+2im*x)*exp(-abs2(Complex(x,y))/2)),
+    (x,y) -> Complex(x,y)*exp(-abs2(Complex(x,y))/2)),
+    (x,y) -> Complex(x,-y)*exp(-abs2(Complex(x,y))/2))
+]
 
 # # Imprinted offset vortex test
 # rv = Complex(1.5, 0.3)
