@@ -1,27 +1,40 @@
 # Bogoliubov-de Gennes problems
 
 """
-    ωs, us, vs = bdg_modes(s, d, ψ, Ω, nev)
+    ωs, us, vs = bdg_modes(s, d, ψ, Ω, nmodes; nev=nmodes, raw=false)
     
 Return vectors of the lowest energy BdG modes
 
-Normalised with ∥u∥² - ∥v∥² = 1.
+TODO Normalised with ∥u∥² - ∥v∥² = 1.
 """
-function bdg_modes(s, d, ψ, Ω, nev)
+function bdg_modes(s, d, ψ, Ω, nmodes; nev=nmodes, raw=false)
     # TODO how many hartree modes to include?
     # write test to double nev, compare first half of modes
+    @info "starting"
     _, us = hartree_modes(s, d, ψ, nev, Ω)
     U = hcat((u[:] for u in us)...)
+    @info "expanding over modes"
     B = expand(bdg_operator(s,d,ψ,Ω), us, conj.(us))
-    ew, ev = eigen(B)
-    @info "max imag frequency" iw=maximum(imag, ew)
+    @info "diagonizing"
+    ew, ev = eigs(B; nev=2nmodes, which=:SM)[1:2]
+    @info "finishing up"
+    ev = [U zero(U); zero(U) conj(U)]*ev
+    if raw
+       ew, ev
+    else
+        bdg_output(d, ew, ev)
+    end
+end
+
+function bdg_output(d, ew, ev)
+    @info "max imag frequency" iw=norm(imag(ew), Inf)
     ew = real(ew)
-    us = [reshape(U*ev[1:nev, j], d.n, d.n) for j = eachindex(ew)]
-    vs = [reshape(conj.(U)*ev[nev+1:end, j], d.n, d.n) for j = eachindex(ew)]
+    us = [reshape(ev[1:d.n^2, j], d.n, d.n) for j = eachindex(ew)]
+    vs = [reshape(ev[d.n^2+1:end, j], d.n, d.n) for j = eachindex(ew)]
     ixs = findall(norm.(us) .> norm.(vs))
-    @assert length(ixs) == nev
+    @assert length(ixs) == length(ew) ÷ 2
     ew[ixs], us[ixs], vs[ixs]
- end
+end
 
 "expand f(u) as a matrix over us"
 function expand(f, us)
@@ -99,18 +112,23 @@ function BdGmatrix(s, d, Ω, ψ, us)
 end
 
 """
-    ωs, us = hartree_modes(s, d, ψ, n, Ω)
+    ωs, us = hartree_modes(s, d, ψ, n, Ω; raw=false)
 
 Return the lowest `n` hartree eigenfunctions
+
+Modes are returned as a vector of N-dimensional arrays.  If `raw` is set true, a unitary matrix of [u1[:] u2[:] ...] is returned instead.
 """
 function hartree_modes end
 
-function hartree_modes(s, d, ψ, nev, Ω)
+function hartree_modes(s, d, ψ, nev, Ω; raw=false)
     L = operators(s, d, :L) |> only
     Lop = LinearMap{Complex{Float64}}(d.n^2) do u
         u = reshape(u, d.n, d.n)
         L(u,abs2.(ψ);Ω)[:]
     end
     ws, us = eigs(Lop; nev, which=:SR)[1:2]
-    ws, [reshape(u, d.n, d.n) for u = eachcol(us)]
+    @info "Maximum imag eigenvalue" im=norm(imag(ws), Inf)
+    ws = real(ws)
+    raw || (us = [reshape(u, d.n, d.n) for u = eachcol(us)])
+    ws, us
 end

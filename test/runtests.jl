@@ -51,7 +51,7 @@ end
 
 @testset "Compare operators to explicit matrices" begin
     d = FDDiscretisation{2}(10, 10/9)
-    s = Superfluid{2}(500, (x,y) -> (x^2+y^2)/2)
+    s = Superfluid{2}(500, (x,y) -> (x^2+y^2)/2, hbm=rand())
     Ω = rand()
     # TODO fuzerate wave functions
     ψ = cloud(d)
@@ -70,6 +70,81 @@ end
     compare(:T, (T,q)->T(q))
     compare(:V, (V,q)->V(q))
     compare(:J, (J,q)->J(q))
+end
+
+@testset "Compare Hartree modes to matrix eigenvectors" begin
+    hbm = rand()
+    Ω = 0.01*hbm	# break degeneracy
+    s = Superfluid{2}(500, (x,y)->(x^2+y^2)/2; hbm)
+    d = FDDiscretisation{2}(40, 15/39)
+    L, J = operators(s,d,:L,:J)
+    ψ = steady_state(s,d;Ω)
+    μ = dot(L(ψ;Ω), ψ) |> real
+    M = matrices(s,d,Ω,ψ,:L) |> only
+    ew, ev = eigen(M)
+    ws, us = hartree_modes(s,d,ψ,10,Ω)
+    @test norm(imag(ws), Inf) < 1e-10
+    ws = real(ws)
+    @test ws[1] ≈ μ
+    @test ws ≈ ew[eachindex(ws)]
+    for (j, u) = pairs(us)
+        @test abs(dot(u, ev[:,j])) ≈ 1
+    end
+    jj = [dot(u,J(u)) for u in us]
+    @test norm(imag(jj), Inf) < 1e-10
+    @test norm(round.(jj) - jj, Inf) < 0.1
+end
+
+@testset "Compare BdG modes with matrix" begin
+    # leave hbm = 1 to keep core smaller than trap
+    Ω = 0.01
+    s = Superfluid{2}(500, (x,y)->(x^2+y^2)/2, hbm=0.5)
+    d = FDDiscretisation{2}(40, 15/39)
+    L, H, J = Superfluids.operators(s,d,:L,:H,:J)
+    ψ = steady_state(s,d;Ω)
+    @test norm(ψ) ≈ 1
+    
+    # Check that this problem is solvable
+    M = Superfluids.BdGmatrix(s,d,Ω,ψ)
+    ew, ev = eigs(M, nev=20, which=:SM)
+    @test norm(imag(ew), Inf) < 1e-3
+    ew = real(ew)
+    @test ew[1] ≈ 0 atol=1e-6
+    for j = 2:2:length(ew)
+        @test ew[j-1] ≈ -ew[j] rtol=1e-3
+    end
+    uu = [reshape(u[1:d.n^2],d.n,d.n) for u in eachcol(ev)]
+    vv = [reshape(v[d.n^2+1:end],d.n,d.n) for v in eachcol(ev)]
+    @test norm(uu[1]) ≈ 1/√2
+    @test norm(vv[1]) ≈ 1/√2
+    @test abs(dot(uu[1],ψ)) ≈ 1/√2 rtol=1e-3
+    @test abs(dot(vv[1],ψ)) ≈ 1/√2 rtol=1e-3
+    ix = ew .≥ 0
+    ew = ew[ix]
+    uu = uu[ix]
+    vv = vv[ix]
+    
+    # Check expansions
+    hw, hv = hartree_modes(s,d,ψ,100,Ω)
+    @test norm(imag(hw), Inf) < 1e-6
+    hw = real(hw)
+    
+    uns = [norm(u)^2 for u in uu]
+    ups = [sum(abs2, dot(h,u) for h in hv) for u in uu]
+    @test uns ≈ ups rtol=0.01
+    vns = [norm(v)^2 for v in vv]
+    vps = [sum(abs2, dot(conj(h),v) for h in hv) for v in vv]
+    @test vns ≈ vps rtol=0.01
+    
+    ws, us, vs = bdg_modes(s, d, ψ, Ω, 100)
+    @test norm(imag(ws), Inf) < 1e-3
+    ws = real(ws)
+    @test ew ≈ ws[eachindex(ew)] rtol=0.05
+    for j = eachindex(ew)
+        u, v = us[j], vs[j]
+        u0, v0 = uu[j], vv[j]
+        @test abs(dot([u0[:]; v0[:]], [u[:]; v[:]])) ≈ 1 rtol=0.03
+    end
 end
 
 @testset "SHO ground state expectation values" begin

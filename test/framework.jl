@@ -1,6 +1,6 @@
-using LinearAlgebra
+using LinearAlgebra, Arpack
 using Superfluids
-using Superfluids: argand, cloud, operators
+using Superfluids: argand, cloud, operators, matrices
 
 s = Superfluid{2}(3000, (x,y) -> (x^2+y^2)/2)
 
