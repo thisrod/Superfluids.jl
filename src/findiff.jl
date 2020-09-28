@@ -14,11 +14,11 @@ struct FDDiscretisation{N} <: Discretisation{N}
     xyz::NTuple{N,Array{Float64,N}}
     scratch
     
-    function FDDiscretisation{2}(n::Int, h::Float64)
+    function FDDiscretisation{2}(n::Int, h::Float64, order=2)
         x = h/2*(1-n:2:n-1)
         x = reshape(x, n, 1)
-        Ds = [(1/h).*op(n, Float64[-1/2, 0, 1/2]),
-            (1/h^2).*op(n, Float64[1, -2, 1])]
+        Ds = [fdop(n, h, 2order+1, 1),
+            fdop(n, h, 2order+1, 2)]
         scratch = [Array{Complex{Float64}}(undef, n, n)
             for j = 1:Threads.nthreads()]
         new(n, h, Ds, (x,x'), scratch)
@@ -49,10 +49,17 @@ function D!(y, d, a, u, n, axis)
     end
 end
 
-function op(n, stencil)
-    mid = (length(stencil)+1)÷2
-    diags = [i-mid=>fill(stencil[i],n-abs(i-mid)) for i = keys(stencil)]
-    BandedMatrix(Tuple(diags), (n,n))
+function fdop(N, h, slength, order)
+    ud = (slength-1)÷2
+    D = BandedMatrix{Float64}(undef, (N,N), (ud,ud))
+    weights = Array{Float64}(undef, N+2)
+    for j = 1:N
+        stencil = (0:N+1) ∩ (j-ud:j+ud)
+        weights .= 0
+        weights[stencil .+ 1] = DiffEqOperators.calculate_weights(order, h*j, h*stencil)
+        D[j, stencil ∩ (1:N)] = weights[(stencil ∩ (1:N)) .+ 1]
+    end
+    D
 end
 
 function primitive_operators(d::FDDiscretisation{2})

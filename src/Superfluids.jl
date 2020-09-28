@@ -5,7 +5,7 @@ export Superfluid, Discretisation, FDDiscretisation, PinnedVortices,
 
 using LinearAlgebra, BandedMatrices, LinearMaps, Optim, Arpack
 using Statistics: mean
-import DifferentialEquations, Interpolations
+import DifferentialEquations, DiffEqOperators, Interpolations
 
 
 # Default parameters
@@ -15,32 +15,28 @@ default() = copy(_defaults)
 default!(k::Symbol, v) = (_defaults[k] = v; nothing)
 default!(d::Dict{Symbol,Any}) = (_defaults=copy(d); nothing)
 
-# define methods for default superfluid and discretisation
+# Generate methods with default arguments
+#
+# Initial arguments s and d can be elided for superfluid and discretisation
+# Keyword arguments with no explicit default are looked up in defaults
 macro defaults(m)
-    # TODO look at types instead of names s and d
-    strip_arg(x::Symbol) = x
-    strip_arg(x) = strip_arg(x.args[1])
-            
-    if (m isa Expr && 
-            m.head in [:(=), :function] &&
-            m.args[1].head == :call)
-        "foo"
-    else
-        error("Not a method definition")
-    end
-    f = m.args[1].args[1]
-    ps = m.args[1].args[2:end]
-    qs = strip_arg.(ps)
-    if length(ps) ≥ 2 && ps[1] == :s && ps[2] == :d
+    ismethod(m) || error("Not a method definition")
+    signature = m.args[1]
+    f = signature.args[1]
+    p = signature.args[2:end]
+    q = strip_arg.(ps)
+    if length(ps) ≥ 2 && isarg(p[1], :Superfluid) && isarg(p[2], :Discretisation)
+        ps = p[3:end]
+        qs = q[3:end]
         quote
-            $f($(ps[3:end]...)) = $f(default(:superfluid), default(:discretisation), $(qs[3:end]...))
-            $f(s::Superfluid, $(ps[3:end]...)) = $f(s, default(:discretisation), $(qs[3:end]...))
-            $f(d::Discretisation, $(ps[3:end]...)) = $f(default(:superfluid), d, $(qs[3:end]...))
+            $f($ps...) = $f(default(:superfluid), default(:discretisation), $qs...)
+            $f($(p[1]), $ps...) = $f($(q[1]), default(:discretisation), $qs...)
+            $f($(p[2]), $ps...) = $f(default(:superfluid), $(q[2]), $qs...)
             $m
         end
-    elseif length(ps) ≥1 && ps[1] == :s
+    elseif length(ps) ≥1 && isarg(ps[1], :Superfluid, :Discretisation)
         quote
-            $f($(ps[2:end]...)) = $f(default(:superfluid), $(qs[2:end]...))
+            $f($(p[2:end])) = $f(default(:superfluid), $qs...)
             $m
         end
     elseif length(ps) ≥1 && ps[1] == :d
@@ -52,6 +48,16 @@ macro defaults(m)
         m
     end
 end
+
+ismethod(m) =
+    m isa Expr && 
+    m.head in [:(=), :function] &&
+    m.args[1].head == :call
+
+strip_arg(x::Symbol) = x
+strip_arg(x) = strip_arg(x.args[1])
+
+isarg(p, syms...) = (p.head == :(::) && p.args[2] in syms)
 
 _defaults = Dict{Symbol,Any}(
     :hbm=>1,

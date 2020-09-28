@@ -107,8 +107,8 @@ function relax_orbit(s, d, r; Ωs, g_tol, iterations)
     L = only(operators(s, d, :L))
     function residual(Ω)
         q = steady_state(s,d; rvs=Complex{Float64}[r], Ω, g_tol, iterations)
-        μ = dot(L(q,Ω), q)
-        sum(abs2, L(q,Ω)-μ*q)
+        μ = dot(L(q;Ω), q)
+        sum(abs2, L(q;Ω)-μ*q)
     end
     Ω = optimize(residual, Ωs..., abs_tol=g_tol).minimizer
     Ω, steady_state(s,d; rvs=Complex{Float64}[r], Ω, g_tol, iterations)
