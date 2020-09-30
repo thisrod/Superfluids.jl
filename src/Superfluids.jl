@@ -66,7 +66,9 @@ _defaults = Dict{Symbol,Any}(
     :dt=>1e-4,
     :relaxer=>Optim.ConjugateGradient,
     :integrator=>DifferentialEquations.RK4,
-    :diagonizer=>nothing	# eigenproblem solver
+    :diagonizer=>nothing,	# eigenproblem solver
+    :xlims=>nothing,
+    :ylims=>nothing
 )
 
 const OPT_ARGS = (:g_tol, :iterations, :relaxer)

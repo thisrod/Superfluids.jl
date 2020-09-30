@@ -19,14 +19,30 @@
 # as soon as an adequate one becomes available.
 # 
 # 
-# ## The equations this solves
+# ## Scope
 # 
-# The Gross-Pitaevskii equation, divided by ``\hbar`` to make every term a rate of change, is
+# Superfluids are a class of physical systems, including Bose-Einstein
+# condensates, that have global coherence described by an order parameter ``\psi``.
+# This package computes order parameters that satisfy the Gross-Pitaevskii
+# equation, and related quantities such as Bogoliubov sound wave
+# modes.  This section will outline the theory, to define the
+# conventions used in the package.  For a full treatment, refer to
+# Fetter & Waleka or Pethick & Smith.
+# 
+# The order parameter theory can be extended to a Monte-Carlo phase
+# space treatment, that includes more quantum mechanical effects.
+# The package does not currently provide explicit support for this,
+# but it would be an obvious extension for the future.
+# 
+# # The GPE, divided by ``\hbar`` to make every term a rate of change, is
 # ```math
-# i\psi_t = \left(-{1\over2}{\hbar\over m}\nabla^2 + {V\over\hbar} +
-#     {C\over\hbar}|\psi|^2\right)\psi.
+# i{\partial\psi\over\partial t} = \left(-{1\over2}{\hbar\over m}\nabla^2 + {V\over\hbar} +
+#     {C\over\hbar}|\psi|^2\right)\psi = {\cal L}\psi.
 # ```
-# (V is a "trap" potential, "C" a repulsion constant, normalisation is described below.)
+# Where ``V`` is an external potential, typically from a trap
+# containing a dilute gas, and ``C`` is a repulsion constant.  This
+# library follows the normalisation convention ``\int |\psi|^2=1``,
+# so the number of particles should be absorbed into ``C``.
 # 
 # For numerical purposes, the factors of 2 are an unsettled matter
 # of taste.  Therefore the package provides a parameter `:hbm` for
@@ -42,15 +58,32 @@ Superfluids.default!(:hbm, 1)
 # In the case that ``V={1\over 2}m\omega x^2`` is a quadratic
 # potential, a common convention is to define the time unit by
 # ``\omega=1``, and use the characteristic trap length
-# ``\sqrt{\hbar^2/m\omega}`` as a length unit.  With the setting `:hbm
+# ``\sqrt{\hbar/m\omega}`` as a length unit.  With the setting `:hbm
 # = 1`, which is the default and used in this manual, the GPE becomes
 # ```math
 # i\psi_t = {1\over2}\left(-\nabla^2 + x^2 +
-#     {\rm something}|\psi|^2\right)\psi.
+#     {C\over\hbar}\left({m\omega\over\hbar}\right)^{N/2}|\psi|^2\right)\psi.
 # ```
-# TODO explain how ``C`` scales with trap length and dimension.
-#
-# Introduce the static and dynamic GPE and the BdG eigenproblem, explain how they relate.
+# Where ``N`` is the dimension of the space on which the GPE is
+# being solved, and the repulsion constant is now dimensionless.
+# 
+# Steady states of the order parameter satisfy a static GPE,
+# ```math
+# {\cal L}\psi = {\mu\over\hbar}\psi
+# ```
+# 
+# Around a steady state ``\psi_0``, small excitations have the form
+# ```math
+# \psi(t,x) = \psi_0(x) + \alpha u(x)e^{i\omega t} + \alpha^\ast v^\ast(x)e^{-i\omega t},
+# ```
+# where ``u`` and ``v`` satisfy the Bogoluibov-de Gennes eigenproblem (TODO check conjugates)
+# ```math
+# ({\cal L}+C|\psi_0|^2) u + C\psi^2v = \omega u
+# ```
+# ```math
+# ({\cal L}+C|\psi_0|^2) v + C\psi^{2\ast}u = -\omega v
+# ```
+# 
 # 
 # ## Superfluids
 # 
@@ -75,6 +108,8 @@ Superfluids.default!(:hbm, 1)
 # ### Wave functions
 # 
 # Everything is normalised with norm(q) = 1, no cleverness about discretisation.
+#
+# Sets of functions, us, vs, ψ(t), are stored as vectors of arrays.
 # 
 # ### Operators
 # 
@@ -186,7 +221,7 @@ Superfluids.default!(:hbm, 1)
 # 
 # ## Version 1
 # 
-# * Support low-order FD and Fourier spectral discretisation
+# * Support FD and Fourier spectral discretisation
 # 
 # * 1D and 2D are feature complete and documented
 # 
@@ -199,8 +234,8 @@ Superfluids.default!(:hbm, 1)
 # ## Version 2
 # 
 # * 3D and multiple components are fully implemented
-# 
-# * Support FD with reasonable stencils
+#
+# * Support for Wigner sampling initial states
 # 
 # * Julia has a ':LM' iterative solver, and the necessary sparse matrix inverses, for the BdG eigenproblem
 # 

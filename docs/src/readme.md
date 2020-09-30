@@ -1,16 +1,41 @@
-## README for Github, uses Literate.jl
+# Superfluids.jl
 
-## Steady state relaxation
+Solve the Gross-Pitaevskiii equation and Bogoliubov-de Gennes eigenproblem
 
-Set up a harmonic trap with l₀ and ω₀ units
+To start, define a 2-dimensional harmonic trap with atomic repulsion
 
-`steady_state` 
+```julia
+using Superfluids, Plots
+s = Superfluid{2}(500, (x,y) -> x^2+y^2)
+```
 
-Plotting wave functions
+and discretise it by a high order finite-difference formula on a
+moderate sized 66×66 grid
+
+```julia
+d = FDDiscretisation{2}(66, 0.3, 7)
+```
+
+Crop superfluid plots to the interesting part of the cloud, but leave other plots as is
+
+```julia
+Superfluids.default!(:xlims, (-5,5))
+Superfluids.default!(:ylims, (-5,5))
+```
+
+The ground state is the expected Thomas-Fermi cloud
+
+```julia
+ψ₀ = steady_state(s,d)
+plot(d, ψ₀, xlims=(-5,5), ylims=(-5,5))
+#hide savefig("sf001.png")
+```
+
+![plot of harmonic trap ground state cloud](sf001.png)
 
 ## GPE dynamics
 
-Demonstrate momentum kick and Kohn mode
+The state `ψ₀` is simply an `Array{2}`, which can be given a momentum kick as follows
 
 Plotting dynamics gives an animation: `plot(::Discretisation{N}, ts, ψs)'.  Where `ψs` can be an `N+1` array, or a vector of `N` arrays.
 
@@ -29,4 +54,8 @@ Relax to that steady lattice
 Add a KT mode
 
 Detect the vortex positions and plot their paths over time
+
+---
+
+*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
 

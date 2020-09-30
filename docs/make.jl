@@ -4,5 +4,5 @@ Literate.markdown("src/index.jl", "./src", documenter=true)
 
 makedocs(
     modules=[Superfluids],
-    sitename="My Documentation"
+    sitename="Superfluids.jl"
 )

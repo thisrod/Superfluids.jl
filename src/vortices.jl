@@ -46,13 +46,23 @@ end
 
 Return the centre of the sole vortex in u
 """
-function find_vortex(d::Discretisation, u)
+function find_vortex(d::Discretisation, u, mask=nothing)
     P, Q = poles(u)
     ixs = abs.(P) .> 0.5maximum(abs.(P))
+    if mask != nothing
+        ixs .&= mask
+    end
     regress_core(d, u, ixs)
 end
 
 find_vortex(u) = find_vortex(default(:discretisation), u)
+
+function find_vortices(d::Discretisation, u)
+    P, Q = poles(u)
+    ixs = abs.(P) .> 0.5maximum(abs.(P))
+    clusters = cluster_adjacent(adjacent_index, keys(ixs)[ixs])
+    [find_vortex(d, u, [j ∈ C for j in keys(u)]) for C in clusters]
+end
 
 # function find_moat(u)
 #     P, Q = poles(u)
@@ -100,6 +110,28 @@ end
 
 box(ixs::AbstractMatrix{Bool}) = box(keys(ixs)[ixs])
 
+
+function cluster_adjacent(f, ixs)
+    # function f determines adjacency
+    clusters = Set()
+    for i in ixs
+        out = Set()
+        ins = Set()
+        for C in clusters
+            if any(j -> f(i,j), C)
+                push!(ins, C)
+            else
+                push!(out, C)
+            end
+        end
+        push!(out, union(Set([i]), ins...))
+        clusters = out
+    end
+    clusters
+end
+
+adjacent_index(j, k) =
+    -1 ≤ j[1] - k[1] ≤ 1 && -1 ≤ j[2] - k[2] ≤ 1
 
 """
     PinnedVortices([s], [d], rv...) <: Optim.Manifold
