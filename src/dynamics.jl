@@ -11,17 +11,15 @@ function integrate(s, d, ψ₀, ts; μ=nothing, dt=default(:dt))
     # TODO amend DifferentialEquations so we can use saveat for this
     L = operators(s, d, :L) |> only
     isnothing(μ) && (μ = real(dot(L(ψ₀), ψ₀)))
-    qs = []
-    if ts[1] ≤ sqrt(eps())
-        push!(qs, ψ₀)
-    else
-        ts = [0, ts]
-    end
-    for j  = 2:length(ts)
-        P = DifferentialEquations.ODEProblem((ψ,_,_)->-1im*(L(ψ)-μ*ψ), qs[j-1], ts[j-1:j])
+    qs = [ψ₀]
+    tt = ts[1] ≤ sqrt(eps()) ? ts : [0; ts]
+
+    for j  = 2:length(tt)
+        P = DifferentialEquations.ODEProblem((ψ,_,_)->-1im*(L(ψ)-μ*ψ), qs[j-1], tt[j-1:j])
         S = DifferentialEquations.solve(P, DifferentialEquations.RK4(), adaptive=false;
-            dt, saveat = ts[j]-ts[j-1])
+            dt, saveat = tt[j]-tt[j-1])
         push!(qs, S[end])
     end
-    qs
+    
+    length(tt) == length(ts) ? qs : qs[2:end]
 end
