@@ -236,6 +236,7 @@ coords(d::Discretisation{N}) where N =
 
 include("findiff.jl")
 include("plotting.jl")
+# vortices must come before relaxation, to define PinnedVortices
 include("vortices.jl")
 include("relaxation.jl")
 include("bogoliubov.jl")

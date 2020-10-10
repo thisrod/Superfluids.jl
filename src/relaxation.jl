@@ -43,7 +43,8 @@ function relax(s::Superfluid{2},
         initial=cloud(d, rvs...),
         g_tol=default(:g_tol),
         relaxer=default(:relaxer),
-        iterations=default(:iterations)
+        iterations=default(:iterations),
+        points=4
     )
     
     L!, H = operators(s, d, :L!, :H)
@@ -52,7 +53,7 @@ function relax(s::Superfluid{2},
         ψ -> dot(ψ,H(ψ; Ω)) |> real,
         (y,ψ) -> (L!(y, ψ; Ω); y .*= 2),
         initial,
-        relaxer(manifold=PinnedVortices(d, rvs...)),
+        relaxer(manifold=PinnedVortices(d, rvs...; points)),
         Optim.Options(iterations=iterations, g_tol=g_tol, allow_f_increases=true)
     )
 end
@@ -103,21 +104,22 @@ usually it increases monotonically.  Therefore the only way to find
 the steady Ω is to minimize the residual, although this is a bit
 inelegant.
 """
-function relax_orbit(s, d, r; Ωs, g_tol, iterations)
-    L = only(operators(s, d, :L))
-    function residual(Ω)
-        q = steady_state(s,d; rvs=Complex{Float64}[r], Ω, g_tol, iterations)
-        μ = dot(L(q;Ω), q)
-        sum(abs2, L(q;Ω)-μ*q)
+function relax_orbit(s, d, r; g_tol, iterations, points=4)
+    L, J = Superfluids.operators(s,d,:L,:J)
+    r = convert(Complex{Float64}, r)
+    Ω = 0.0
+    rdl2 = 0.01
+    q = Superfluids.cloud(d, r)
+    for _ = 1:100
+        rdl2 < g_tol^2 && break
+        q = steady_state(s,d; rvs=[r], Ω, g_tol=0.01*√rdl2, initial=q, iterations, points)
+        Ω, μ = [J(q)[:] q[:]] \ L(q)[:]
+        # TODO extrapolate Ω assuming geometric convergence
+        Ω = real(Ω)
+        rdl2 = sum(abs2, L(q;Ω)-μ*q)
     end
-    Ω = optimize(residual, Ωs..., abs_tol=g_tol).minimizer
-    Ω, steady_state(s,d; rvs=Complex{Float64}[r], Ω, g_tol, iterations)
+    Ω, q
 end
-
-PinnedVortices(d::Discretisation, rvs::Vararg{Number}) =
-    PinnedVortices(d, [convert(Complex{Float64}, r) for r in rvs]...)
-PinnedVortices(rvs::Vararg{Number}) =
-    PinnedVortices(default(:discretisation), rvs...)
 
 
 # Helper functions for circular part winding number

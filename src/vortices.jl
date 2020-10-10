@@ -46,11 +46,10 @@ end
 
 Return the centre of the sole vortex in u
 """
-function find_vortex(d::Discretisation, u, mask=nothing)
+function find_vortex(d::Discretisation, u, ixs=nothing)
     P, Q = poles(u)
-    ixs = abs.(P) .> 0.5maximum(abs.(P))
-    if mask != nothing
-        ixs .&= mask
+    if isnothing(ixs)
+        ixs = abs.(P) .> 0.5maximum(abs.(P))
     end
     regress_core(d, u, ixs)
 end
@@ -146,12 +145,12 @@ at every rv (and maybe at other points too).
 struct PinnedVortices <: Manifold
    ixs::Matrix{Int}		# 2D array, column of indices for each vortex
    U::Matrix{Complex{Float64}}		# U[i,j] is a coefficient for z[ixs[i,j]]
-   function PinnedVortices(d::Discretisation, rvs::Vararg{Complex{Float64}})
+   function PinnedVortices(d::Discretisation, rvs::Vararg{Complex{Float64}}; points)
         z = argand(d)
-        ixs = Array{Int}(undef, 4, length(rvs))
+        ixs = Array{Int}(undef, points, length(rvs))
         U = ones(eltype(z), size(ixs))
         for (j, rv) = pairs(rvs)
-            ixs[:,j] = sort(eachindex(z), by=k->abs(z[k]-rv))[1:4]
+            ixs[:,j] = sort(eachindex(z), by=k->abs(z[k]-rv))[1:points]
             a = normalize(z[ixs[:,j]].-rv)
             U[:,j] .-= a*(a'*U[:,j])
             # Orthonormalise as we go
@@ -159,8 +158,8 @@ struct PinnedVortices <: Manifold
             # TODO check for which order Gram-Schmidt is stable
             # Although these are only parallel if two vortices are within a pixel
 #             for k = 1:j
-#                 a = zeros(eltype(z), 4)
-#                 for m = 1:4
+#                 a = zeros(eltype(z), points)
+#                 for m = 1:points
 #                     n = findfirst(isequal(ixs[m,j]), ixs[:,k])
 #                     isnothing(n) || (a[n] = U[n,k])
 #                 end
@@ -171,6 +170,11 @@ struct PinnedVortices <: Manifold
         new(ixs, U)
    end
 end
+
+PinnedVortices(d::Discretisation, rvs::Vararg{Number}; points=4) =
+    PinnedVortices(d, [convert(Complex{Float64}, r) for r in rvs]...; points)
+PinnedVortices(rvs::Vararg{Number}; points=4) =
+    PinnedVortices(default(:discretisation), rvs...; points)
 
 function prjct!(M, q)
     for j = 1:size(M.ixs,2)
