@@ -23,38 +23,37 @@ function steady_state(s::Superfluid, d::Discretisation; args...)
     result.minimizer
 end
 
-steady_state(;args...) =
+steady_state(; args...) =
     steady_state(default(:superfluid), default(:discretisation); args...)
-steady_state(s::Superfluid; args...) =
-    steady_state(s, default(:discretisation); args...)
-steady_state(d::Discretisation; args...) =
-    steady_state(default(:superfluid), d; args...)
-       
+steady_state(s::Superfluid; args...) = steady_state(s, default(:discretisation); args...)
+steady_state(d::Discretisation; args...) = steady_state(default(:superfluid), d; args...)
+
 
 """
     relax([s], [d]; Ω=0, rvs=[], initial, [Optim args])
 
 Return an Optim result whose minimizer is `steady_state`
 """
-function relax(s::Superfluid{2},
-        d::Discretisation{2};
-        Ω::Float64=0.0,
-        rvs::Vector{Complex{Float64}}=Complex{Float64}[],
-        initial=cloud(d, rvs...),
-        g_tol=default(:g_tol),
-        relaxer=default(:relaxer),
-        iterations=default(:iterations),
-        points=4
-    )
-    
+function relax(
+    s::Superfluid{2},
+    d::Discretisation{2};
+    Ω::Float64 = 0.0,
+    rvs::Vector{Complex{Float64}} = Complex{Float64}[],
+    initial = cloud(d, rvs...),
+    g_tol = default(:g_tol),
+    relaxer = default(:relaxer),
+    iterations = default(:iterations),
+    points = 4,
+)
+
     L!, H = operators(s, d, :L!, :H)
     # TODO use allocation-free H!
     Optim.optimize(
-        ψ -> dot(ψ,H(ψ; Ω)) |> real,
-        (y,ψ) -> (L!(y, ψ; Ω); y .*= 2),
+        ψ -> dot(ψ, H(ψ; Ω)) |> real,
+        (y, ψ) -> (L!(y, ψ; Ω); y .*= 2),
         initial,
-        relaxer(manifold=PinnedVortices(d, rvs...; points)),
-        Optim.Options(iterations=iterations, g_tol=g_tol, allow_f_increases=true)
+        relaxer(manifold = PinnedVortices(d, rvs...; points)),
+        Optim.Options(iterations = iterations, g_tol = g_tol, allow_f_increases = true),
     )
 end
 
@@ -64,13 +63,13 @@ end
 
 Sample a smooth field that will efficiently relax
 """
-function cloud(d::FDDiscretisation{2}, rvs::Vararg{Complex{Float64}})
-    f(x,y) = cos(π*x/(d.n+1)/d.h)*cos(π*y/(d.n+1)/d.h)
+function cloud(d::Sampling{2}, rvs::Vararg{Complex{Float64}})
+    f(x, y) = cos(π * x / (d.n + 1) / d.h) * cos(π * y / (d.n + 1) / d.h)
     z = argand(d)
     φ = similar(z)
     φ .= sample(f, d)
     for r in rvs
-        @. φ *= (z-r)
+        @. φ *= (z - r)
     end
     normalize!(φ)
 end
@@ -104,19 +103,28 @@ usually it increases monotonically.  Therefore the only way to find
 the steady Ω is to minimize the residual, although this is a bit
 inelegant.
 """
-function relax_orbit(s, d, r; g_tol, iterations, points=4)
-    L, J = Superfluids.operators(s,d,:L,:J)
+function relax_orbit(s, d, r; g_tol, iterations, points = 4)
+    L, J = Superfluids.operators(s, d, :L, :J)
     r = convert(Complex{Float64}, r)
     Ω = 0.0
     rdl2 = 0.01
     q = Superfluids.cloud(d, r)
     for _ = 1:100
         rdl2 < g_tol^2 && break
-        q = steady_state(s,d; rvs=[r], Ω, g_tol=0.01*√rdl2, initial=q, iterations, points)
+        q = steady_state(
+            s,
+            d;
+            rvs = [r],
+            Ω,
+            g_tol = 0.01 * √rdl2,
+            initial = q,
+            iterations,
+            points,
+        )
         Ω, μ = [J(q)[:] q[:]] \ L(q)[:]
         # TODO extrapolate Ω assuming geometric convergence
         Ω = real(Ω)
-        rdl2 = sum(abs2, L(q;Ω)-μ*q)
+        rdl2 = sum(abs2, L(q; Ω) - μ * q)
     end
     Ω, q
 end
@@ -133,15 +141,11 @@ Return indices of d circling the origin at radius r
 function loopixs(d::Discretisation{2}, r)
     z = argand(d)
     ixs = eachindex(z)
-    ixs = ixs[@. r-d.h < abs(z[ixs]) < r+d.h]
-    sort!(ixs, by=j->angle(z[j]))
+    ixs = ixs[@. r - d.h < abs(z[ixs]) < r + d.h]
+    sort!(ixs, by = j -> angle(z[j]))
 end
 
 function winding(u, ixs)
-    hh = unroll(angle.(u[ixs]))/2π
-    round(Int, hh[end]-hh[1])
+    hh = unroll(angle.(u[ixs])) / 2π
+    round(Int, hh[end] - hh[1])
 end
-
-
-
-

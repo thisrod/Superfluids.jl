@@ -6,16 +6,16 @@
 Return the Wirtinger derivatives of u, assuming a unit grid step
 """
 function poles(u)
-    N = size(u,1)
-    @assert N == size(u,2)
+    N = size(u, 1)
+    @assert N == size(u, 2)
     u = complex.(u)
-    rs = (-1:1) .+ 1im*(-1:1)'
+    rs = (-1:1) .+ 1im * (-1:1)'
     rs /= sum(abs2.(rs))
-    conv(u, rs) = [rs.*u[j:j+2,k:k+2] |> sum for j = 1:N-2, k = 1:N-2]
+    conv(u, rs) = [rs .* u[j:j+2, k:k+2] |> sum for j = 1:N-2, k = 1:N-2]
     P = zero(u)
-    P[2:end-1,2:end-1] .= conv(u, conj(rs))
+    P[2:end-1, 2:end-1] .= conv(u, conj(rs))
     Q = zero(u)
-    Q[2:end-1,2:end-1] .= conv(u, rs)
+    Q[2:end-1, 2:end-1] .= conv(u, rs)
     P, Q
 end
 
@@ -46,7 +46,7 @@ end
 
 Return the centre of the sole vortex in u
 """
-function find_vortex(d::Discretisation, u, ixs=nothing)
+function find_vortex(d::Discretisation, u, ixs = nothing)
     P, Q = poles(u)
     if isnothing(ixs)
         ixs = abs.(P) .> 0.5maximum(abs.(P))
@@ -74,21 +74,22 @@ function regress_core(d, u, ixs)
     z = argand(d)
     ixs = expand_box(box(ixs))[:]
     a, b, c = [z[ixs] conj(z[ixs]) ones(size(z[ixs]))] \ u[ixs]
-    (b*conj(c)-conj(a)*c)/(abs2(a)-abs2(b))
+    (b * conj(c) - conj(a) * c) / (abs2(a) - abs2(b))
 end
 
 function expand_box(bb::CartesianIndices{2})
-    e1, e2 = ((1,0), (0,1)) .|> CartesianIndex
+    e1, e2 = ((1, 0), (0, 1)) .|> CartesianIndex
     # TODO raise issue on CartesianIndex half-pregnancy
-    if length(bb) ==1
+    if length(bb) == 1
         bb = bb[]
         bb = [
-            bb-e1-e2 bb-e1 bb-e1+e2;
-            bb-e2 bb bb+e2;
-            bb+e1-e2 bb+e1 bb+e1+e2] 
-    elseif size(bb,1) ==1
-        bb = [bb .- e1; bb; bb .+ e1] 
-    elseif size(bb,2) ==1
+            bb-e1-e2 bb-e1 bb-e1+e2
+            bb-e2 bb bb+e2
+            bb+e1-e2 bb+e1 bb+e1+e2
+        ]
+    elseif size(bb, 1) == 1
+        bb = [bb .- e1; bb; bb .+ e1]
+    elseif size(bb, 2) == 1
         bb = [bb .- e2 bb bb .+ e2]
     end
     bb
@@ -96,15 +97,15 @@ end
 
 "Bounding box of cartesian indices"
 function box(cixs::AbstractVector{CartesianIndex{2}})
-   j1 = k1 = typemax(Int)
-   j2 = k2 = typemin(Int)
-   for c in cixs
-       j1 = min(j1,c[1])
-       j2 = max(j2,c[1])
-       k1 = min(k1,c[2])
-       k2 = max(k2,c[2])
-   end
-   CartesianIndices((j1:j2, k1:k2))
+    j1 = k1 = typemax(Int)
+    j2 = k2 = typemin(Int)
+    for c in cixs
+        j1 = min(j1, c[1])
+        j2 = max(j2, c[1])
+        k1 = min(k1, c[2])
+        k2 = max(k2, c[2])
+    end
+    CartesianIndices((j1:j2, k1:k2))
 end
 
 box(ixs::AbstractMatrix{Bool}) = box(keys(ixs)[ixs])
@@ -117,7 +118,7 @@ function cluster_adjacent(f, ixs)
         out = Set()
         ins = Set()
         for C in clusters
-            if any(j -> f(i,j), C)
+            if any(j -> f(i, j), C)
                 push!(ins, C)
             else
                 push!(out, C)
@@ -129,8 +130,7 @@ function cluster_adjacent(f, ixs)
     clusters
 end
 
-adjacent_index(j, k) =
-    -1 ≤ j[1] - k[1] ≤ 1 && -1 ≤ j[2] - k[2] ≤ 1
+adjacent_index(j, k) = -1 ≤ j[1] - k[1] ≤ 1 && -1 ≤ j[2] - k[2] ≤ 1
 
 """
     PinnedVortices([s], [d], rv...) <: Optim.Manifold
@@ -143,48 +143,47 @@ The space orthogonal to every o comprises the fields with a vortex
 at every rv (and maybe at other points too).
 """
 struct PinnedVortices <: Manifold
-   ixs::Matrix{Int}		# 2D array, column of indices for each vortex
-   U::Matrix{Complex{Float64}}		# U[i,j] is a coefficient for z[ixs[i,j]]
-   function PinnedVortices(d::Discretisation, rvs::Vararg{Complex{Float64}}; points)
+    ixs::Matrix{Int}# 2D array, column of indices for each vortex
+    U::Matrix{Complex{Float64}}# U[i,j] is a coefficient for z[ixs[i,j]]
+    function PinnedVortices(d::Discretisation, rvs::Vararg{Complex{Float64}}; points)
         z = argand(d)
         ixs = Array{Int}(undef, points, length(rvs))
         U = ones(eltype(z), size(ixs))
-        for (j, rv) = pairs(rvs)
-            ixs[:,j] = sort(eachindex(z), by=k->abs(z[k]-rv))[1:points]
-            a = normalize(z[ixs[:,j]].-rv)
-            U[:,j] .-= a*(a'*U[:,j])
+        for (j, rv) in pairs(rvs)
+            ixs[:, j] = sort(eachindex(z), by = k -> abs(z[k] - rv))[1:points]
+            a = normalize(z[ixs[:, j]] .- rv)
+            U[:, j] .-= a * (a' * U[:, j])
             # Orthonormalise as we go
             # TODO test and uncomment this
             # TODO check for which order Gram-Schmidt is stable
             # Although these are only parallel if two vortices are within a pixel
-#             for k = 1:j
-#                 a = zeros(eltype(z), points)
-#                 for m = 1:points
-#                     n = findfirst(isequal(ixs[m,j]), ixs[:,k])
-#                     isnothing(n) || (a[n] = U[n,k])
-#                 end
-#                 U[:,j] .-= a*(a'*U[:,j])
-#             end
-            U[:,j] = normalize(U[:,j])
+            #             for k = 1:j
+            #                 a = zeros(eltype(z), points)
+            #                 for m = 1:points
+            #                     n = findfirst(isequal(ixs[m,j]), ixs[:,k])
+            #                     isnothing(n) || (a[n] = U[n,k])
+            #                 end
+            #                 U[:,j] .-= a*(a'*U[:,j])
+            #             end
+            U[:, j] = normalize(U[:, j])
         end
         new(ixs, U)
-   end
+    end
 end
 
-PinnedVortices(d::Discretisation, rvs::Vararg{Number}; points=4) =
+PinnedVortices(d::Discretisation, rvs::Vararg{Number}; points = 4) =
     PinnedVortices(d, [convert(Complex{Float64}, r) for r in rvs]...; points)
-PinnedVortices(rvs::Vararg{Number}; points=4) =
+PinnedVortices(rvs::Vararg{Number}; points = 4) =
     PinnedVortices(default(:discretisation), rvs...; points)
 
 function prjct!(M, q)
-    for j = 1:size(M.ixs,2)
-        q[M.ixs[:,j]] .-= M.U[:,j]*(M.U[:,j]'*q[M.ixs[:,j]])
+    for j = 1:size(M.ixs, 2)
+        q[M.ixs[:, j]] .-= M.U[:, j] * (M.U[:, j]' * q[M.ixs[:, j]])
     end
     q
 end
 
 # The "vortex at R" space is invariant under normalisation
-Optim.retract!(M::PinnedVortices, q) =
-    Optim.retract!(Sphere(), prjct!(M, q))
+Optim.retract!(M::PinnedVortices, q) = Optim.retract!(Sphere(), prjct!(M, q))
 Optim.project_tangent!(M::PinnedVortices, dq, q) =
-    Optim.project_tangent!(Sphere(), prjct!(M, dq),q)
+    Optim.project_tangent!(Sphere(), prjct!(M, dq), q)

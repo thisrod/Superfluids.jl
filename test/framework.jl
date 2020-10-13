@@ -67,6 +67,7 @@ function sho_error(d)
     norm(q - w*(w'*q))
 end
 
+TODO figure out why this breaks JuliaFormatter
 "Expectation values of operators in SHO ground state"
 function sho_energies(d)
     z = argand(d)

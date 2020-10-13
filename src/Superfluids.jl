@@ -1,9 +1,17 @@
 module Superfluids
 
-export Superfluid, Discretisation, FDDiscretisation, PinnedVortices,
-    steady_state, find_vortex, relax_orbit, hartree_modes, bdg_modes
+export Superfluid,
+    Discretisation,
+    FDDiscretisation,
+    FourierDiscretisation,
+    PinnedVortices,
+    steady_state,
+    find_vortex,
+    relax_orbit,
+    hartree_modes,
+    bdg_modes
 
-using LinearAlgebra, BandedMatrices, LinearMaps, Optim, Arpack
+using LinearAlgebra, BandedMatrices, LinearMaps, Optim, Arpack, FFTW
 using Statistics: mean
 import DifferentialEquations, DiffEqOperators, Interpolations
 
@@ -13,7 +21,7 @@ import DifferentialEquations, DiffEqOperators, Interpolations
 default(k::Symbol) = get(_defaults, k, nothing)
 default() = copy(_defaults)
 default!(k::Symbol, v) = (_defaults[k] = v; nothing)
-default!(d::Dict{Symbol,Any}) = (_defaults=copy(d); nothing)
+default!(d::Dict{Symbol,Any}) = (_defaults = copy(d); nothing)
 
 # Generate methods with default arguments
 #
@@ -34,12 +42,12 @@ macro defaults(m)
             $f($(p[2]), $ps...) = $f(default(:superfluid), $(q[2]), $qs...)
             $m
         end
-    elseif length(ps) ≥1 && isarg(ps[1], :Superfluid, :Discretisation)
+    elseif length(ps) ≥ 1 && isarg(ps[1], :Superfluid, :Discretisation)
         quote
             $f($(p[2:end])) = $f(default(:superfluid), $qs...)
             $m
         end
-    elseif length(ps) ≥1 && ps[1] == :d
+    elseif length(ps) ≥ 1 && ps[1] == :d
         quote
             $f($(ps[2:end]...)) = $f(default(:discretisation), $(qs[2:end]...))
             $m
@@ -49,10 +57,7 @@ macro defaults(m)
     end
 end
 
-ismethod(m) =
-    m isa Expr && 
-    m.head in [:(=), :function] &&
-    m.args[1].head == :call
+ismethod(m) = m isa Expr && m.head in [:(=), :function] && m.args[1].head == :call
 
 strip_arg(x::Symbol) = x
 strip_arg(x) = strip_arg(x.args[1])
@@ -60,20 +65,20 @@ strip_arg(x) = strip_arg(x.args[1])
 isarg(p, syms...) = (p.head == :(::) && p.args[2] in syms)
 
 _defaults = Dict{Symbol,Any}(
-    :hbm=>1,
-    :g_tol=>1e-6,
-    :iterations=>1000,
-    :dt=>1e-4,
-    :relaxer=>Optim.ConjugateGradient,
-    :integrator=>DifferentialEquations.RK4,
-    :diagonizer=>nothing,	# eigenproblem solver
-    :xlims=>nothing,
-    :ylims=>nothing
+    :hbm => 1,
+    :g_tol => 1e-6,
+    :iterations => 1000,
+    :dt => 1e-4,
+    :relaxer => Optim.ConjugateGradient,
+    :integrator => DifferentialEquations.RK4,
+    :diagonizer => nothing,# eigenproblem solver
+    :xlims => nothing,
+    :ylims => nothing,
 )
 
 const OPT_ARGS = (:g_tol, :iterations, :relaxer)
 const DIFEQ_ARGS = (:dt, :formula)
-      
+
 
 """
     struct Superfluid{N}
@@ -81,12 +86,12 @@ const DIFEQ_ARGS = (:dt, :formula)
 N-dimensional superfluid
 """
 struct Superfluid{N}
-    C::Float64				# repulsion constant
+    C::Float64# repulsion constant
     hbm::Float64
-    V				# (x,y) -> V
+    V::Any# (x,y) -> V
 end
 
-Superfluid{N}(C::Real, V=(x...)->0.0; hbm::Real=default(:hbm)) where N =
+Superfluid{N}(C::Real, V = (x...) -> 0.0; hbm::Real = default(:hbm)) where {N} =
     Superfluid{N}(convert(Float64, C), convert(Float64, hbm), V)
 
 default!(v::Superfluid) = default!(:superfluid, v)
@@ -171,34 +176,44 @@ function operators(s::Superfluid, d::Discretisation, syms::Vararg{Symbol})
     # TODO does primitive_operators need @inline?
     Δ!, W!, J! = primitive_operators(d)
     Vmat = sample(s.V, d)
-    
-    V!(u,ψ) = (@. u += Vmat*ψ; u)
-    U!(u,a,ψ,ρ=abs2.(ψ)) = (W!(u, s.C*a, ρ, ψ); u)
-    T!(u,ψ) = (Δ!(u,-s.hbm/2,ψ); u)
-    L!(u,ψ,ρ=abs2.(ψ); Ω=0) = LH!(u,1,ψ,ρ,Ω)
-    H!(u,ψ,ρ=abs2.(ψ); Ω=0) = LH!(u,1/2,ψ,ρ,Ω)
-    
-    function LH!(u,a,ψ,ρ,Ω)
+
+    V!(u, ψ) = (@. u += Vmat * ψ; u)
+    U!(u, a, ψ, ρ = abs2.(ψ)) = (W!(u, s.C * a, ρ, ψ); u)
+    T!(u, ψ) = (Δ!(u, -s.hbm / 2, ψ); u)
+    L!(u, ψ, ρ = abs2.(ψ); Ω = 0) = LH!(u, 1, ψ, ρ, Ω)
+    H!(u, ψ, ρ = abs2.(ψ); Ω = 0) = LH!(u, 1 / 2, ψ, ρ, Ω)
+
+    function LH!(u, a, ψ, ρ, Ω)
         u .= 0
-        T!(u,ψ)
-        V!(u,ψ)
-        U!(u,a,ψ,ρ)
-        J!(u,-Ω,ψ)
+        T!(u, ψ)
+        V!(u, ψ)
+        U!(u, a, ψ, ρ)
+        J!(u, -Ω, ψ)
         u
     end
-    
-    T(ψ) = T!(zero(ψ),ψ)
-    V(ψ) = V!(zero(ψ),ψ)
+
+    T(ψ) = T!(zero(ψ), ψ)
+    V(ψ) = V!(zero(ψ), ψ)
     # The primitive J! might not return u
-    J(ψ) = (u=zero(ψ); J!(u,1,ψ); u)
-    U(ψ,ρ=abs2.(ψ)) = U!(zero(ψ),1,ψ,ρ)
-    L(ψ,ρ=abs2.(ψ); Ω=0) = L!(similar(ψ), ψ,ρ; Ω)
-    H(ψ,ρ=abs2.(ψ); Ω=0) = H!(similar(ψ), ψ,ρ; Ω)
-    
+    J(ψ) = (u = zero(ψ); J!(u, 1, ψ); u)
+    U(ψ, ρ = abs2.(ψ)) = U!(zero(ψ), 1, ψ, ρ)
+    L(ψ, ρ = abs2.(ψ); Ω = 0) = L!(similar(ψ), ψ, ρ; Ω)
+    H(ψ, ρ = abs2.(ψ); Ω = 0) = H!(similar(ψ), ψ, ρ; Ω)
+
     # Return those requested
     ops = Dict(
-        :V=>V, :T=>T, :U=>U, :J=>J, :L=>L, :H=>H,
-        :V! =>V!, :T! =>T!, :U! =>U!, :J! =>J!, :L! =>L!, :H! =>H!
+        :V => V,
+        :T => T,
+        :U => U,
+        :J => J,
+        :L => L,
+        :H => H,
+        :V! => V!,
+        :T! => T!,
+        :U! => U!,
+        :J! => J!,
+        :L! => L!,
+        :H! => H!,
     )
     [ops[j] for j in syms]
 end
@@ -227,14 +242,13 @@ function primitive_operators(::Discretisation) end
 
 
 # argand(d::Discretisation) = sample(Complex, d)
-argand(d::Discretisation) = sample((x,y)->x+1im*y, d)
+argand(d::Discretisation) = sample((x, y) -> x + 1im * y, d)
 argand() = argand(default(:discretisation))
 
 
-coords(d::Discretisation{N}) where N =
-    [sample((r...)->r[j], d) for j = 1:N]
+coords(d::Discretisation{N}) where {N} = [sample((r...) -> r[j], d) for j = 1:N]
 
-include("findiff.jl")
+include("sampling.jl")
 include("plotting.jl")
 # vortices must come before relaxation, to define PinnedVortices
 include("vortices.jl")
