@@ -145,7 +145,8 @@ at every rv (and maybe at other points too).
 struct PinnedVortices <: Manifold
     ixs::Matrix{Int}# 2D array, column of indices for each vortex
     U::Matrix{Complex{Float64}}# U[i,j] is a coefficient for z[ixs[i,j]]
-    function PinnedVortices(d::Discretisation, rvs::Vararg{Complex{Float64}}; points)
+    
+    function PinnedVortices(d::FDDiscretisation, rvs::Vararg{Complex{Float64}}; points)
         z = argand(d)
         ixs = Array{Int}(undef, points, length(rvs))
         U = ones(eltype(z), size(ixs))
@@ -169,12 +170,23 @@ struct PinnedVortices <: Manifold
         end
         new(ixs, U)
     end
+    
+    function PinnedVortices(d::FourierDiscretisation{2}, rvs::Vararg{Complex{Float64}}; r = 0.0)
+        z = argand(d)
+        ixs = repeat(collect(eachindex(z)), 1, length(rvs))
+        U = similar(ixs, eltype(z))
+        for j = eachindex(rvs)
+            U[:,j] = finterp(d, rvs[j], r)[:]
+        end
+        U, _ = qr(U)
+        new(ixs,U)
+    end
 end
 
-PinnedVortices(d::Discretisation, rvs::Vararg{Number}; points = 4) =
-    PinnedVortices(d, [convert(Complex{Float64}, r) for r in rvs]...; points)
-PinnedVortices(rvs::Vararg{Number}; points = 4) =
-    PinnedVortices(default(:discretisation), rvs...; points)
+PinnedVortices(d::Discretisation, rvs::Vararg{Number}; kwargs...) =
+    PinnedVortices(d, [convert(Complex{Float64}, r) for r in rvs]...; kwargs...)
+PinnedVortices(rvs::Vararg{Number}; kwargs...) =
+    PinnedVortices(default(:discretisation), rvs...; kwargs...)
 
 function prjct!(M, q)
     for j = 1:size(M.ixs, 2)

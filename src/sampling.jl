@@ -108,6 +108,9 @@ end
 
 function D!(y, d::FourierDiscretisation{2}, a, u, n, axis)
     iks = 2π * complex.(0, fftfreq(d.n, 1 / d.h))
+    if axis == 2
+        iks = transpose(iks)
+    end
     buf = copy(u)
     fft!(buf, axis)
     @. buf *= iks^(n)
@@ -120,4 +123,28 @@ function sample(f, d::FourierDiscretisation{2})
     x = h / 2 * (1-n:2:n-1)
     x = reshape(x, n, 1)
     f.(x, x')
+end
+
+"""
+    finterp(d,r)
+
+Fourier interpolation weights
+"""
+function finterp1(d, r::Float64)
+    x = first(daxes(d))[:]
+    u = zeros(Complex{Float64}, d.n)
+    u[1] = 1
+    ks = 2π * fftfreq(d.n, 1 / d.h)
+    fft!(u)
+    @. u *= exp(-1im*ks*(r-x[1]))
+    ifft!(u)
+    real(u)
+end
+
+finterp(d, r, a) = finterp1(d, real(r), a) .* transpose(finterp1(d, imag(r), a))
+
+function daxes(d::Sampling{2})
+    x = d.h / 2 * (1-d.n:2:d.n-1)
+    x = reshape(x, d.n, 1)
+    (x, transpose(x))
 end
