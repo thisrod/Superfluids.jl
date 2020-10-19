@@ -146,7 +146,7 @@ struct PinnedVortices <: Manifold
     ixs::Matrix{Int}# 2D array, column of indices for each vortex
     U::Matrix{Complex{Float64}}# U[i,j] is a coefficient for z[ixs[i,j]]
     
-    function PinnedVortices(d::FDDiscretisation, rvs::Vararg{Complex{Float64}}; points)
+    function PinnedVortices(d::FDDiscretisation, rvs::Vararg{Complex{Float64}}; points=4)
         z = argand(d)
         ixs = Array{Int}(undef, points, length(rvs))
         U = ones(eltype(z), size(ixs))
@@ -171,12 +171,12 @@ struct PinnedVortices <: Manifold
         new(ixs, U)
     end
     
-    function PinnedVortices(d::FourierDiscretisation{2}, rvs::Vararg{Complex{Float64}}; r = 0.0)
+    function PinnedVortices(d::FourierDiscretisation{2}, rvs::Vararg{Complex{Float64}}; a = 0.0)
         z = argand(d)
         ixs = repeat(collect(eachindex(z)), 1, length(rvs))
         U = similar(ixs, eltype(z))
         for j = eachindex(rvs)
-            U[:,j] = finterp(d, rvs[j], r)[:]
+            U[:,j] = finterp(d, rvs[j], a)[:]
         end
         U, _ = qr(U)
         new(ixs,U)

@@ -130,12 +130,14 @@ end
 
 Fourier interpolation weights
 """
-function finterp1(d, r::Float64)
+function finterp1(d, r::Float64, a=0.0)
     x = first(daxes(d))[:]
-    u = zeros(Complex{Float64}, d.n)
-    u[1] = 1
-    ks = 2π * fftfreq(d.n, 1 / d.h)
+    a = max(a, eps())
+    # Centre on a grid point in case a « h
+    u = similar(x, Complex{Float64})
+    @. u = exp(-(x-x[1])^2/2a^2)
     fft!(u)
+    ks = 2π * fftfreq(d.n, 1 / d.h)
     @. u *= exp(-1im*ks*(r-x[1]))
     ifft!(u)
     real(u)

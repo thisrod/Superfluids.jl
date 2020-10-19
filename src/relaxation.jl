@@ -43,7 +43,7 @@ function relax(
     g_tol = default(:g_tol),
     relaxer = default(:relaxer),
     iterations = default(:iterations),
-    points = 4,
+    kwargs...
 )
 
     L!, H = operators(s, d, :L!, :H)
@@ -52,7 +52,7 @@ function relax(
         ψ -> dot(ψ, H(ψ; Ω)) |> real,
         (y, ψ) -> (L!(y, ψ; Ω); y .*= 2),
         initial,
-        relaxer(manifold = PinnedVortices(d, rvs...; points)),
+        relaxer(manifold = PinnedVortices(d, rvs...; kwargs...)),
         Optim.Options(iterations = iterations, g_tol = g_tol, allow_f_increases = true),
     )
 end
