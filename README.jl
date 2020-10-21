@@ -1,3 +1,5 @@
+## julia -e 'using Literate; Literate.markdown("README.jl", "."; documenter=false)'
+
 # # Superfluids.jl
 # 
 # Solve the Gross-Pitaevskiii equation and Bogoliubov-de Gennes eigenproblem

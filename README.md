@@ -1,17 +1,86 @@
+```julia
+# julia -e 'using Literate; Literate.markdown("README.jl", "."; documenter=false)
+```
+
 # Superfluids.jl
 
-A wrapper for Julia's numerical libraries, to compute the eigenstates and dynamics of the Gross-Pitaevskii and the Bogoliubov-de Gennes equations.
+Solve the Gross-Pitaevskiii equation and Bogoliubov-de Gennes eigenproblem
 
-Remember: just encapsulate what you have, don't immediately add intervals or anything fancy.
+To start, define a 2-dimensional harmonic trap with atomic repulsion
 
-A `Superfluid` stores `V`, as a function of coordinates, `Nc`, `C`, and `Ω`.  The `Nc` can be `missing` in case of a uniform fluid or a pure order parameter problem.
+```julia
+using Superfluids, Plots
+s = Superfluid{2}(500, (x, y) -> x^2 + y^2)
+```
 
-A `Discretisation` includes a domain.  It has a `laplacian` method that returns the laplacian as a Tensar, `angular` that gives the angular momentum operator, and `position` that evaluates a function of coordinates and returns a tensar diagonal in the position basis.
+and discretise it by a high order finite-difference formula on a
+moderate sized 66×66 grid
 
-## Defaults
+```julia
+d = FDDiscretisation{2}(66, 0.3)
+```
 
-`default` and `default!`
+Crop superfluid plots to the interesting part of the cloud, but leave other plots as is
 
-Clash with plots
+```julia
+Superfluids.default!(:xlims, (-5, 5))
+Superfluids.default!(:ylims, (-5, 5))
+```
 
-`Superfluid` and `Discretisation` special cases
+The ground state is the expected Thomas-Fermi cloud
+
+```julia
+ψ₀ = steady_state(s, d)
+plot(d, ψ₀)
+#hide savefig("sf001.png")
+```
+
+![plot of harmonic trap ground state cloud](sf001.png)
+
+## GPE dynamics
+
+The state `ψ₀` is simply an `Array{2}`, which can be given a momentum kick as follows
+
+```julia
+q = ψ₀ .* Superfluids.sample((x, y) -> exp(1im * (x - y / 2)), d)
+plot(d, q)
+```
+
+The dynamics can be solved as follows.  The range is the times
+to return the order paramter.
+
+```julia
+qs = Superfluids.integrate(s, d, q, 0:0.1:2π)
+@animate for q in qs
+    plot(d, q)
+end
+#hide gif(ans, "sf002.gif"; fps=3)
+```
+
+![animation of harmonic trap Kohn mode](sf002.gif)
+
+## Bogoliubov de-Gennes modes
+
+Find the Kohn mode statically
+
+```julia
+ωs, us, vs = bdg_modes(s, d, ψ₀, 0.0, 15, nev = 50)
+Superfluids.bdgspectrum(s, d, ωs, us, vs, leg = :none)
+```
+
+Animate and compare to GPE solution
+
+## Vortices
+
+Show the energy landscape of a 7-vortex array, find a frame where there is a steady one
+
+Relax to that steady lattice
+
+Add a KT mode
+
+Detect the vortex positions and plot their paths over time
+
+---
+
+*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+
