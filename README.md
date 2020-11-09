@@ -1,86 +1,32 @@
-```julia
-# julia -e 'using Literate; Literate.markdown("README.jl", "."; documenter=false)
-```
+# Superfluids
 
-# Superfluids.jl
+*Solvers for the Gross-Pitaevskiii equation and the Bogoliubov-de
+Gennes eigenproblem in Julia.*
 
-Solve the Gross-Pitaevskiii equation and Bogoliubov-de Gennes eigenproblem
+## Installation
 
-To start, define a 2-dimensional harmonic trap with atomic repulsion
+The package can be installed with the Julia package manager.  From
+the Julia REPL, type `]` to enter the Pkg REPL mode and run:
 
-```julia
-using Superfluids, Plots
-s = Superfluid{2}(500, (x, y) -> x^2 + y^2)
-```
+``` pkg> add https://github.com/thisrod/Superfluids.jl.git ```
 
-and discretise it by a high order finite-difference formula on a
-moderate sized 66×66 grid
+Or, equivalently, via the `Pkg` API:
 
-```julia
-d = FDDiscretisation{2}(66, 0.3)
-```
+```julia julia> import Pkg;
+Pkg.add(url="https://github.com/thisrod/Superfluids.jl.git") ```
 
-Crop superfluid plots to the interesting part of the cloud, but leave other plots as is
+## Project Aim and Status
 
-```julia
-Superfluids.default!(:xlims, (-5, 5))
-Superfluids.default!(:ylims, (-5, 5))
-```
+This is an early prototype, and the interface is often completely
+redesigned.  Use at your own risk.  The current implementation only
+supports 2-dimensional order parameters, but they mostly work.
 
-The ground state is the expected Thomas-Fermi cloud
+There is a roadmap for future development in the documentation.
 
-```julia
-ψ₀ = steady_state(s, d)
-plot(d, ψ₀)
-#hide savefig("sf001.png")
-```
+## Questions and Contributions
 
-![plot of harmonic trap ground state cloud](sf001.png)
+At this stage, questions and feedback should be raised as issues
+on this repository.  Pull requests are welcome, also reports of
+what other people (try and fail to) do with the package.
 
-## GPE dynamics
-
-The state `ψ₀` is simply an `Array{2}`, which can be given a momentum kick as follows
-
-```julia
-q = ψ₀ .* Superfluids.sample((x, y) -> exp(1im * (x - y / 2)), d)
-plot(d, q)
-```
-
-The dynamics can be solved as follows.  The range is the times
-to return the order paramter.
-
-```julia
-qs = Superfluids.integrate(s, d, q, 0:0.1:2π)
-@animate for q in qs
-    plot(d, q)
-end
-#hide gif(ans, "sf002.gif"; fps=3)
-```
-
-![animation of harmonic trap Kohn mode](sf002.gif)
-
-## Bogoliubov de-Gennes modes
-
-Find the Kohn mode statically
-
-```julia
-ωs, us, vs = bdg_modes(s, d, ψ₀, 0.0, 15, nev = 50)
-Superfluids.bdgspectrum(s, d, ωs, us, vs, leg = :none)
-```
-
-Animate and compare to GPE solution
-
-## Vortices
-
-Show the energy landscape of a 7-vortex array, find a frame where there is a steady one
-
-Relax to that steady lattice
-
-Add a KT mode
-
-Detect the vortex positions and plot their paths over time
-
----
-
-*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-
+## Examples

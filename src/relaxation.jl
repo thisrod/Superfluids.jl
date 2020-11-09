@@ -43,6 +43,8 @@ function relax(
     g_tol = default(:g_tol),
     relaxer = default(:relaxer),
     iterations = default(:iterations),
+    store_trace = false,
+    show_trace = false,
     kwargs...
 )
 
@@ -53,7 +55,7 @@ function relax(
         (y, ψ) -> (L!(y, ψ; Ω); y .*= 2),
         initial,
         relaxer(manifold = PinnedVortices(d, rvs...; kwargs...)),
-        Optim.Options(iterations = iterations, g_tol = g_tol, allow_f_increases = true),
+        Optim.Options(iterations = iterations, g_tol = g_tol, allow_f_increases = true; store_trace, show_trace, extended_trace=store_trace),
     )
 end
 

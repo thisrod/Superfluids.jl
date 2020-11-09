@@ -1,3 +1,21 @@
+"""
+`Superfluids.jl` — solvers for the Gross-Pitaevskiii equation and
+the Bogoliubov-de Gennes eigenproblem.
+
+Most every user will construct objects of type `Superfluid`, and
+one of `FDDiscretisation` or `FourierDiscretisation`.
+
+The main functions for public use are:
+
+- `steady_state` and `steady_lattice`.  Initialise ground-state order parameters.
+- `modes`.  Find Bogoliubov-de Gennes modes.
+- `integrate`.  Solve the Gross-Pitaevskii equation.
+- `sample` and `argand`.  Discretise fields.
+
+# Exports
+
+
+"""
 module Superfluids
 
 export Superfluid,
