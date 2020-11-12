@@ -11,9 +11,8 @@ The main functions for public use are:
 - `modes`.  Find Bogoliubov-de Gennes modes.
 - `integrate`.  Solve the Gross-Pitaevskii equation.
 - `sample` and `argand`.  Discretise fields.
-
-# Exports
-
+- `interpolate`.  Evaluate a discretised field at a point.
+- `find_vortices`.  Locate the phase singularities in a field.
 
 """
 module Superfluids

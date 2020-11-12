@@ -137,49 +137,50 @@ adjacent_index(j, k) = -1 ≤ j[1] - k[1] ≤ 1 && -1 ≤ j[2] - k[2] ≤ 1
 
 Constrain a field to have vortices centred at the rvs
 
-Sampling at the grid points around each rv, let o be the component
-of 1 that is orthogonal to (z-rv), and zero on the rest of the grid.
-The space orthogonal to every o comprises the fields with a vortex
-at every rv (and maybe at other points too).
+TODO document the new point-estimates and Gaussians approach
 """
 struct PinnedVortices <: Manifold
-    ixs::Matrix{Int}# 2D array, column of indices for each vortex
-    U::Matrix{Complex{Float64}}# U[i,j] is a coefficient for z[ixs[i,j]]
+    # V'*ψ[:] is a vector of interpolated ψ.(rvs)
+    # (1-U*V')*ψ projects the singularities back to the rvs
+    # TODO make these Tensars
+    U::Matrix{Complex{Float64}}
+    V::Matrix{Complex{Float64}}
     
-    function PinnedVortices(d::FDDiscretisation, rvs::Vararg{Complex{Float64}}; points=4)
-        z = argand(d)
-        ixs = Array{Int}(undef, points, length(rvs))
-        U = ones(eltype(z), size(ixs))
-        for (j, rv) in pairs(rvs)
-            ixs[:, j] = sort(eachindex(z), by = k -> abs(z[k] - rv))[1:points]
-            a = normalize(z[ixs[:, j]] .- rv)
-            U[:, j] .-= a * (a' * U[:, j])
-            # Orthonormalise as we go
-            # TODO test and uncomment this
-            # TODO check for which order Gram-Schmidt is stable
-            # Although these are only parallel if two vortices are within a pixel
-            #             for k = 1:j
-            #                 a = zeros(eltype(z), points)
-            #                 for m = 1:points
-            #                     n = findfirst(isequal(ixs[m,j]), ixs[:,k])
-            #                     isnothing(n) || (a[n] = U[n,k])
-            #                 end
-            #                 U[:,j] .-= a*(a'*U[:,j])
-            #             end
-            U[:, j] = normalize(U[:, j])
-        end
-        new(ixs, U)
-    end
+#     function PinnedVortices(d::FDDiscretisation, rvs::Vararg{Complex{Float64}}; points=4)
+#         z = argand(d)
+#         ixs = Array{Int}(undef, points, length(rvs))
+#         U = ones(eltype(z), size(ixs))
+#         for (j, rv) in pairs(rvs)
+#             ixs[:, j] = sort(eachindex(z), by = k -> abs(z[k] - rv))[1:points]
+#             a = normalize(z[ixs[:, j]] .- rv)
+#             U[:, j] .-= a * (a' * U[:, j])
+#             # Orthonormalise as we go
+#             # TODO test and uncomment this
+#             # TODO check for which order Gram-Schmidt is stable
+#             # Although these are only parallel if two vortices are within a pixel
+#             #             for k = 1:j
+#             #                 a = zeros(eltype(z), points)
+#             #                 for m = 1:points
+#             #                     n = findfirst(isequal(ixs[m,j]), ixs[:,k])
+#             #                     isnothing(n) || (a[n] = U[n,k])
+#             #                 end
+#             #                 U[:,j] .-= a*(a'*U[:,j])
+#             #             end
+#             U[:, j] = normalize(U[:, j])
+#         end
+#         new(ixs, U)
+#     end
     
-    function PinnedVortices(d::FourierDiscretisation{2}, rvs::Vararg{Complex{Float64}}; a = 0.0)
+    function PinnedVortices(d::FourierDiscretisation{2}, rvs::Vararg{Complex{Float64}}; as = zeros(length(rvs)))
+        # TODO solve a linear system in the u(rvs) to make U exact
         z = argand(d)
-        ixs = repeat(collect(eachindex(z)), 1, length(rvs))
-        U = similar(ixs, eltype(z))
+        U = Array{Complex{Float64}}(undef, length(z), length(rvs))
+        V = similar(U)
         for j = eachindex(rvs)
-            U[:,j] = finterp(d, rvs[j], a)[:]
+            U[:,j] = finterp(d, rvs[j], as[j])[:]
+            V[:,j] = finterp(d, rvs[j], 0.0)[:]
         end
-        U, _ = qr(U)
-        new(ixs,U)
+        new(U, V)
     end
 end
 
@@ -189,10 +190,8 @@ PinnedVortices(rvs::Vararg{Number}; kwargs...) =
     PinnedVortices(default(:discretisation), rvs...; kwargs...)
 
 function prjct!(M, q)
-    for j = 1:size(M.ixs, 2)
-        q[M.ixs[:, j]] .-= M.U[:, j] * (M.U[:, j]' * q[M.ixs[:, j]])
-    end
-    q
+    w = q[:]
+    q .-= reshape(M.U*(M.V'*w), size(q))
 end
 
 # The "vortex at R" space is invariant under normalisation
