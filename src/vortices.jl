@@ -143,46 +143,33 @@ struct PinnedVortices <: Manifold
     # V'*ψ[:] is a vector of interpolated ψ.(rvs)
     # (1-U*V')*ψ projects the singularities back to the rvs
     # TODO make these Tensars
+    # TODO solve a linear system in the u(rvs) to make the projection exact
     U::Matrix{Complex{Float64}}
     V::Matrix{Complex{Float64}}
-    
-#     function PinnedVortices(d::FDDiscretisation, rvs::Vararg{Complex{Float64}}; points=4)
-#         z = argand(d)
-#         ixs = Array{Int}(undef, points, length(rvs))
-#         U = ones(eltype(z), size(ixs))
-#         for (j, rv) in pairs(rvs)
-#             ixs[:, j] = sort(eachindex(z), by = k -> abs(z[k] - rv))[1:points]
-#             a = normalize(z[ixs[:, j]] .- rv)
-#             U[:, j] .-= a * (a' * U[:, j])
-#             # Orthonormalise as we go
-#             # TODO test and uncomment this
-#             # TODO check for which order Gram-Schmidt is stable
-#             # Although these are only parallel if two vortices are within a pixel
-#             #             for k = 1:j
-#             #                 a = zeros(eltype(z), points)
-#             #                 for m = 1:points
-#             #                     n = findfirst(isequal(ixs[m,j]), ixs[:,k])
-#             #                     isnothing(n) || (a[n] = U[n,k])
-#             #                 end
-#             #                 U[:,j] .-= a*(a'*U[:,j])
-#             #             end
-#             U[:, j] = normalize(U[:, j])
-#         end
-#         new(ixs, U)
-#     end
-    
-    function PinnedVortices(d::FourierDiscretisation{2}, rvs::Vararg{Complex{Float64}}; as = zeros(length(rvs)))
-        # TODO solve a linear system in the u(rvs) to make U exact
-        z = argand(d)
-        U = Array{Complex{Float64}}(undef, length(z), length(rvs))
+
+    function PinnedVortices(
+        d::Sampling{2},
+        rvs::Vararg{Complex{Float64}};
+        as = zeros(length(rvs)),
+    )
+        U = Array{Complex{Float64}}(undef, d.n^2, length(rvs))
         V = similar(U)
-        for j = eachindex(rvs)
-            U[:,j] = finterp(d, rvs[j], as[j])[:]
-            V[:,j] = finterp(d, rvs[j], 0.0)[:]
+        for j in eachindex(rvs)
+            U[:, j] = finterp(d, rvs[j], as[j])[:]
+            V[:, j] = interpolant(d, rvs[j])[:]
         end
         new(U, V)
     end
 end
+
+"""
+    finterp(d, r, a)
+
+Return interpolant(d, r) convoluted with a Gaussian of width a.
+
+Subtracting this is a stable way to shift a vortex by further than one pixel.
+"""
+function finterp end
 
 PinnedVortices(d::Discretisation, rvs::Vararg{Number}; kwargs...) =
     PinnedVortices(d, [convert(Complex{Float64}, r) for r in rvs]...; kwargs...)
@@ -191,7 +178,7 @@ PinnedVortices(rvs::Vararg{Number}; kwargs...) =
 
 function prjct!(M, q)
     w = q[:]
-    q .-= reshape(M.U*(M.V'*w), size(q))
+    q .-= reshape(M.U * (M.V' * w), size(q))
 end
 
 # The "vortex at R" space is invariant under normalisation

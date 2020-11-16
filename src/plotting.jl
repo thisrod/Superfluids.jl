@@ -3,14 +3,7 @@
 using RecipesBase, ComplexPhasePortrait
 
 @recipe function f(d::Sampling{2}, u::Matrix{Complex{Float64}})
-    x, y = if d isa FDDiscretisation
-        d.xyz
-    elseif d isa FourierDiscretisation
-        x = d.h / 2 * (1-d.n:2:d.n-1)
-        x = reshape(x, d.n, 1)
-        x, x'
-    end
-
+    x, y = daxes(d)
     let xs = default(:xlims), ys = default(:ylims)
         xlims --> (isnothing(xs) ? (x[1], x[end]) : xs)
         ylims --> (isnothing(ys) ? (y[1], y[end]) : ys)
