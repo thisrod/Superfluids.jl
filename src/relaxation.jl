@@ -87,17 +87,18 @@ cloud(rvs::Vararg{Complex{Float64}}) = cloud(default(:discretisation), rvs...)
 
 
 """
-    Ω, q = acquire(steady_state args)
-    
-Find a rotating frame frequency that minimises the residual for the specified vortices
-"""
+    Ω, ψ, rvs = steady_lattice(f, s, d, ps...; method=:residual)
 
-"""
-    ps, q = relax_lattice(f, s, d, Ω, ps)
+Return a relaxed lattice configuration
 
-Optimise ps to find a steady lattice in the rotating frame
+The function `f(p1, p2, ...)` returns a list of vortex positions.
+The parameters are relaxed from the initial values `ps`.
 
-The lattice has vortices at `f(ps)`.
+By default, the configuration is adjusted to minimize the residual
+in a rotating frame.  Setting `method=:minimum` finds a minimum
+energy configuration, `method=:maximum` a maximum energy one.  Beware
+that many stationary lattices occur at saddle points of the energy
+functional.
 """
 
 

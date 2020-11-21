@@ -73,10 +73,21 @@ Superfluids.bdgspectrum(s, d, ωs, us, vs, leg = :none)
 # 
 # ### Vortices
 # 
-# Show the energy landscape of a 7-vortex array, find a frame where there is a steady one
-# 
-# Relax to that steady lattice
-# 
+# A novel feature of Superfluids is the ability to relax the order parameter, while constraining the positions of the vortices.  For example, we can plot the energy landscape of a vortex lattice, as a function of the lattice spacing.
+
+Ω = 0.4
+uu = @. exp(2π*1im*(0:5)/6)
+uu = [0, uu...]
+rr = 0.5:0.5:4
+qs = [steady_state(s, d; Ω, rvs=r*uu) for r in rr]
+H = Superfluids.operators(s, d, :H) |> only
+Es = [dot(q, H(q;Ω)) |> real for q in qs]
+scatter(rr, Es)
+
+# The function `steady_lattice` relaxes the vortices to a steady lattice.
+
+... = steady_lattice(r -> r*uu, s, d, 2.0)
+
 # Add a KT mode
 # 
 # Detect the vortex positions and plot their paths over time
