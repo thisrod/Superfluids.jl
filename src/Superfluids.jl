@@ -10,9 +10,9 @@ The main functions for public use are:
 - `steady_state` and `steady_lattice`.  Initialise ground-state order parameters.
 - `modes`.  Find Bogoliubov-de Gennes modes.
 - `integrate`.  Solve the Gross-Pitaevskii equation.
-- `sample` and `argand`.  Discretise fields.
-- `interpolate`.  Evaluate a discretised field at a point.
-- `find_vortices`.  Locate the phase singularities in a field.
+- `sample` and `argand`.  Discretise order parameters and other fields.
+- `interpolate`.  Evaluate a discretised field.
+- `find_vortices`.  Locate phase singularities.
 
 """
 module Superfluids
@@ -35,8 +35,6 @@ using LinearAlgebra, BandedMatrices, LinearMaps, Optim, Arpack, FFTW
 using Statistics: mean
 import DifferentialEquations, DiffEqOperators, Interpolations
 
-include("defaults.jl")
-
 """
     struct Superfluid{N}
 
@@ -51,8 +49,6 @@ end
 Superfluid{N}(C::Real, V = (x...) -> 0.0; hbm::Real = default(:hbm)) where {N} =
     Superfluid{N}(convert(Float64, C), convert(Float64, hbm), V)
 
-default!(v::Superfluid) = default!(:superfluid, v)
-
 
 """
     abstract type Discretisation{N}
@@ -61,8 +57,9 @@ A domain with a way to discretise an order parameter on it.
 """
 abstract type Discretisation{N} end
 Discretisation() = default(:discretisation)
-default!(v::Discretisation) = default!(:discretisation, v)
 
+# This requires the Superfluid and Discretisation types
+include("defaults.jl")
 
 """
     sample(f, d::Discretisation)
@@ -105,7 +102,7 @@ Let `u` be a normalised vector, that discretises the normalised
 wave function ``\\psi(x,y,z)``.  The returned functions are selected
 by symbols as follows:
 
-* `:L` for the GPE dynamics operator 
+* `:L` for the GPE dynamics operator
 
 * `:H` for the GPE energy operator
 

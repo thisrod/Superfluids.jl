@@ -262,29 +262,37 @@ V(0.2,0.3) ≈ V1(0.2,0.3) ≈ interpolate(u, d, 0.2, 0.3)
 # 
 # Animating modes
 # 
-# ## Parameters
+# ## Parameters and defaults
 # 
-# Which `Optim` parameters can be passed on
+# Like `Plots.jl`, this package has a lot of parameters that users will
+# sometimes need to adjust. Moreover, almost every function takes a
+# `Superfluid` or a `Discretisation` argument, or both, and it is common
+# for these to be the same for every call in a simulation. Configurable
+# defaults are provided to suppress the redundant arguments in
+# user-facing functions, through the `default` and `default!` functions
+# that are used throughout this manual.
 # 
-# Which `DifferentialEquations` parameters
+# Most exported functions take a `Superfluid` or a `Discretisation` as
+# their first argument, or both in that order as their first two
+# arguments. The exceptions are `sample`, `argand` and `steady_lattice`,
+# which put their function argument first to allow the use of `do`
+# syntax. Once `Superfluids.default!` has been called with an argument
+# of type `Superfluid` or `Discretisation`, these arguments can be
+# omitted, and the default will be used.
 # 
-# Almost every function in the Superfluids library must be passed a
-# `Superfluid`, or at least a `Discretisation`.  To avoid unnecessary
-# typing, these arguments are optional, and there is a mechanism
-# borrowed from `Plots.jl` to specify defaults.
+# The remaining defaults are keyword arguments to `Superfluid`
+# functions, most of which are passed on to `Plots`,
+# `DifferentialEquations` and `Optim`. Those arguments are described in
+# the relevant sections of this manual, along with their default values
+# when `Superfluids` is loaded. The syntax to override the default is
+# `default!(:parameter, value)`. The default superfluid can be set with
+# `default!(:superfluid, s)`, and the discretisation with
+# `default!(:discretisation, d)`.
 # 
-# ```@docs
+# # ```@docs
 # default
 # default!
 # ```
-# 
-# Other arguments are in the same boat:
-# 
-# * `:g_tol`  The residual to which order parameters are relaxed.
-# 
-# * `:dt`  The time step for solving the GPE
-# 
-# * `:xlims`, `:ylims`  As for `Plots.jl`, but applied only when `plot` is called with a `Discretisation` argument. 
 # 
 # # Manual
 #
