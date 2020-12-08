@@ -38,3 +38,51 @@ function finterp1(d, r::Float64, a = 0.0)
     ifft!(u)
     real(u)
 end
+
+function dmats(d::FourierDiscretisation{2})
+    # differentiate delta functions
+    
+    u = zeros(Complex{Float64}, d.n, 1)
+    u[1] = 1
+    D1 = Array{Complex{Float64}}(undef, d.n, d.n)
+    y = zeros(Complex{Float64}, d.n, 1)
+    dif!(y, d, 1, u; axis=1)
+    for j = 1:d.n
+        D1[:, j] = circshift(y, j-1)
+    end
+    D2 = Array{Complex{Float64}}(undef, d.n, d.n)
+    y = zeros(Complex{Float64}, d.n, 1)
+    dif2!(y, d, 1, u; axis=1)
+    for j = 1:d.n
+        D2[:, j] = circshift(y, j-1)
+    end
+    D1, D2
+end
+
+"""
+    matrices(s::Superfluid{2}, d::FourierDiscretisation{2}, Ω, ψ, syms::Vararg{Symbol})
+
+Like operators, but as matrices instead of functions.
+
+The argument ψ is an order parameter to linearise U about.
+This is the kind of place that TensArrays will be useful.
+
+TODO Combine the FDDiscretisation and FourierDiscretisation methods
+into a Sampling method (rename Sampling to Collocation?)
+"""
+function matrices(s::Superfluid{2}, d::FourierDiscretisation{2}, Ω, ψ, syms::Vararg{Symbol})
+    x, y = daxes(d)
+    ∂, ∂² = dmats(d)
+    V = diagm(0 => sample(s.V, d)[:])
+    eye = Matrix(I, d.n, d.n)
+    ρ = diagm(0 => abs2.(ψ[:]))
+
+    T = -s.hbm * kron(eye, ∂²) / 2 - s.hbm * kron(∂², eye) / 2
+    U = s.C / d.h^2 * ρ
+    J = -1im * (repeat(x, 1, d.n)[:] .* kron(∂, eye) - repeat(y, d.n, 1)[:] .* kron(eye, ∂))
+    L = T + V + U - Ω * J
+    H = T + V + U / 2 - Ω * J
+
+    ops = Dict(:V => V, :T => T, :U => U, :J => J, :L => L, :H => H)
+    isempty(syms) ? ops : [ops[j] for j in syms]
+end
