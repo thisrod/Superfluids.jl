@@ -56,27 +56,28 @@ Superfluid{N}(C::Real, V = (x...) -> 0.0; hbm::Real = default(:hbm)) where {N} =
 A domain with a way to discretise an order parameter on it.
 """
 abstract type Discretisation{N} end
-Discretisation() = default(:discretisation)
 
-# This requires the Superfluid and Discretisation types
+# Macros to generate optional arguments.  These require the Superfluid
+# and Discretisation types
+
 include("defaults.jl")
 
+@defaults sample(f, d::Discretisation)
 """
     sample(f, d::Discretisation)
 
 Return an array discretising the function f.
-"""
-function sample(f, d::Discretisation) end
-sample(f) = sample(f, Discretisation())
+""" sample
 
+@defaults argand(f, d::Discretisation)
 """
     argand(f, d::Discretisation{2})
 
 Return an array discretising the function f(x+1im*y).
 
 If f is omitted, the complex plane is discretised with f as the identity.
-"""
-argand() = argand(default(:discretisation))
+""" argand
+argand() = argand(z->z)
 
 function dif! end
 function dif2! end
@@ -93,6 +94,7 @@ Add `a .* u_axis` to y in place.
     @doc s dif2!
 end
 
+@defaults operators(s::Superfluid, d::Discretisation, syms::Vararg{Symbol})
 """
     o1, ... = operators(s::Superfluid, d::Discretisation, s1, ...)
 
@@ -130,8 +132,7 @@ similarly `V!`.  A scalar `a` is provided to `U!(u,a,ρ,ψ)` to add
 
 TODO DiscretisedSuperfluid memoizes the operators, can record an order
 parameter.  `discretise!`
-"""
-function operators end
+""" operators
 
 function operators(s::Superfluid, d::Discretisation, syms::Vararg{Symbol})
     # TODO does primitive_operators need @inline?

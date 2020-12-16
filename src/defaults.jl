@@ -10,94 +10,115 @@ default!(v::Discretisation) = default!(:discretisation, v)
 # TODO extend Documenter to format docstrings for default symbols, and
 # warn about symbols in the default table that are not documented.
 
-# Generate methods with default arguments
+# TODO ask why optional positional arguments must come at the end.
+# (Kind of similar to why Julia doesn't add multiple dispatch when it already handles ambiguity.)
+
+# Abstract syntax types
+
+struct Xpn{S} <: AbstractVector{Any}
+    args
+end
+
+const MethodDefinition = Union{Xpn{:(=)}, Xpn{:function}}
+
+# Generate default arguments
 #
-# Initial arguments s and d can be elided for superfluid and discretisation
-# Keyword arguments with no explicit default are looked up in defaults
+# If the expression m is a call, define the function and methods that allow
+# initial arguments of types Superfluid and Discretisation to be elided.
+#
+# If m is a method definition, keyword arguments with no explicit
+# default are looked up in defaults
 
-# Dispatch on the types of the parameters
+macro defaults(E) defaults(xpn(E)) |> esc end
 
-const SoD = Union{Superfluid, Discretisation}
-
-macro defaults(m)
-    ismethod(m) || error("Not a method definition")
-    # first, write out function f end to hook the docstring
+defaults(E::Xpn{:call}) = 
     quote
-        $(default_methods(m, method_types(m)...))
+        function $(called_function(E)) end
+        $(default_methods(E)...)
     end
-#     signature = m.args[1]
-#     f = signature.args[1]
-#     p = signature.args[2:end]
-#     q = strip_arg.(ps)
-#     if length(ps) ≥ 2 && isarg(p[1], :Superfluid) && isarg(p[2], :Discretisation)
-#         ps = p[3:end]
-#         qs = q[3:end]
-#         quote
-#             $f($ps...) = $f(default(:superfluid), default(:discretisation), $qs...)
-#             $f($(p[1]), $ps...) = $f($(q[1]), default(:discretisation), $qs...)
-#             $f($(p[2]), $ps...) = $f(default(:superfluid), $(q[2]), $qs...)
-#             $m
-#         end
-#     elseif length(ps) ≥ 1 && isarg(ps[1], :Superfluid, :Discretisation)
-#         quote
-#             $f($(p[2:end])) = $f(default(:superfluid), $qs...)
-#             $m
-#         end
-#     elseif length(ps) ≥ 1 && ps[1] == :d
-#         quote
-#             $f($(ps[2:end]...)) = $f(default(:discretisation), $(qs[2:end]...))
-#             $m
-#         end
-#     else
-#         m
-#     end
+
+defaults(E::MethodDefinition) = default_kwargs(E)
+
+# The whole generated code is escaped from hygene, so default is
+# inserted as a function, not as a symbol to be evaluated in the
+# module where @defaults is expanded.
+
+default_methods(E) = default_methods(E, method_types(E))
+default_methods(E, ts) = [elided(E, e) for e in power_set(elisions(ts...)...)]
+
+elisions(::Type{Superfluid}, _...) = [1=>:superfluid]
+elisions(::Type{Discretisation}, _...) = [1=>:discretisation]
+elisions(::Type{Superfluid}, ::Type{Discretisation}, _...) =
+    [1=>:superfluid, 2=>:discretisation]
+elisions(_, t::Union{Type{Superfluid}, Type{Discretisation}}, ts...) =
+    [(j+1)=>s for (j,s) in elisions(t, ts...)]
+
+function elided(E, ds)
+    as = args(E)
+    bs = copy(as)
+    for d in ds
+        bs[d[1]] = :( $default($(QuoteNode(d[2]))) ) |> xpn
+    end
+    as = as[setdiff(eachindex(as), first.(ds))]
+    Xpn{:function}([method_call(E, as), method_call(E, bs)]) |> expr
 end
 
-default_methods(m, ::Type{Superfluid}, _...) =
-    method_aps(m) do as, _
-        quote
-            $(method_call(m, as[2:end])) =
-                $(method_call(m, [:(default(:superfluid)), as[2:end]...]))
-        end
-    end
+power_set() = []
+power_set(a) = [[a]]
+power_set(a,b) = [[a], [b], [a,b]]
 
-# TODO implement abstract syntax à la SICP in Base.Meta
-# even better, replace ex.head with subtypes of expression
+"Add defaults for keyword arguments" 
+function default_kwargs(E)
+    as, ps = aps(E)
+    Xpn{:function}([method_call(E, as, add_defaults(ps)), body(E)]) |> expr
+end
 
-ismethod(m) = false
-ismethod(m::Expr) =
-    m.head in [:(=), :function] &&
-    m.args[1].head == :call
+# This doesn't handle typed keyword parameters
+add_defaults(ps) = [
+    (p isa Symbol && haskey(_defaults, p)) ?
+    Xpn{:kw}([p, xpn(:( $default($(QuoteNode(p))) ))]) :
+    p
+    for p in ps]
 
-method_call(m) = m.args[1]
-method_call(m, arguments, parameters=[:(kwargs...)]) =
-    :( $(method_function(m))(
-        $(arguments...);
-        $(parameters...)))
-method_function(m) = method_call(m).args[1]
-method_arguments(m) = method_aps(m)[1]
-method_parameters(m) = method_aps(m)[2]
+# Abstract syntax
 
-function method_aps(m)
-    arg_list = method_call(m).args[2:end]
-    if arg_list[1].head == :parameters
-        arg_list[2:end], arg_list[1].args
+xpn(E) = E
+xpn(E::Expr) = Xpn(E)
+Xpn(E::Expr) = Xpn{E.head}(xpn.(E.args))
+Base.size(E::Xpn) = size(E.args)
+Base.getindex(E::Xpn, i) = E.args[i]
+expr(E) = E
+expr(E::Xpn{S}) where S = Expr(S, expr.(E)...)
+
+called_function(E::Xpn{:call}) = E[1]
+called_function(E::MethodDefinition) = called_function(E[1])
+body(E::MethodDefinition) = E[2]
+
+args(E::Xpn) = aps(E)[1]
+kwargs(E::Xpn) = aps(E)[2]
+aps(E::MethodDefinition) = aps(E[1])
+function aps(E::Xpn{:call})
+    arg_list = E[2:end]
+    if arg_list[1] isa Xpn{:parameters}
+        arg_list[2:end], collect(arg_list[1])
     else
-        arg_list, []
+        arg_list, Xpn[]
     end
 end
-method_aps(f, m) = f(method_aps(m)...)
 
-function method_types(m::Expr)
+method_call(E::MethodDefinition, xs...) = method_call(E[1], xs...)
+method_call(E::Xpn{:call}, args, kwargs=[Xpn(:(kwargs...))]) =
+    :( $(called_function(E))(
+        $(expr.(args)...);
+        $(expr.(kwargs)...))) |> Xpn
+
+function method_types(m::Xpn)
     t(x::Symbol) = Any
-    t(x::Expr) = eval(x.args[2])
-    t.(method_arguments(m))
+    # In principle, type identifiers should be evaluated in the module
+    # where @defaults is expanded.  In practice that is always Superfluids.
+    t(E::Xpn) = eval(E[2])
+    t.(args(m))
 end
-
-# strip_arg(x::Symbol) = x
-# strip_arg(x) = strip_arg(x.args[1])
-
-# isarg(p, syms...) = (p.head == :(::) && p.args[2] in syms)
 
 _defaults = Dict{Symbol,Any}(
     :hbm => 1,

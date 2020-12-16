@@ -1,5 +1,6 @@
 # Rotating frame relaxation of vortex orbits and lattices
 
+@defaults steady_state(s::Superfluid, d::Discretisation)
 """
     steady_state([s], [d]; Ω=0, rvs=[], initial, [Optim args])
 
@@ -16,17 +17,13 @@ If both `rvs` and `initial` are provided, the initial wave function
 should actually have vortices at the pinned locations.
 
 See also: relax
-"""
+""" steady_state
+
 function steady_state(s::Superfluid, d::Discretisation; args...)
     result = relax(s, d; args...)
     Optim.converged(result) || error("Order parameter failed to converge")
     result.minimizer
 end
-
-steady_state(; args...) =
-    steady_state(default(:superfluid), default(:discretisation); args...)
-steady_state(s::Superfluid; args...) = steady_state(s, default(:discretisation); args...)
-steady_state(d::Discretisation; args...) = steady_state(default(:superfluid), d; args...)
 
 
 """
