@@ -63,12 +63,12 @@ function find_vortices(d::Discretisation, u)
     [find_vortex(d, u, [j ∈ C for j in keys(u)]) for C in clusters]
 end
 
-# function find_moat(u)
-#     P, Q = poles(u)
-#     v = @. (R-w/2 < r < R+w/2)*abs(P+conj(Q))/abs(u)
-#     ixs = v .> 0.5maximum(v)
-#     regress_core(u, ixs)
-# end
+function find_moat(d::Discretisation, u)
+    P, Q = poles(u)
+    v = @. (R-w/2 < r < R+w/2)*abs(P+conj(Q))/abs(u)
+    ixs = v .> 0.5maximum(v)
+    regress_core(d, u, ixs)
+end
 
 function regress_core(d, u, ixs)
     z = argand(d)

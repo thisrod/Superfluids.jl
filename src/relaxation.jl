@@ -110,7 +110,7 @@ usually it increases monotonically.  Therefore the only way to find
 the steady Ω is to minimize the residual, although this is a bit
 inelegant.
 """
-function relax_orbit(s, d, r; g_tol, iterations, points = 4)
+function relax_orbit(s, d, r; g_tol, iterations, a=0)
     L, J = Superfluids.operators(s, d, :L, :J)
     r = convert(Complex{Float64}, r)
     Ω = 0.0
@@ -126,7 +126,7 @@ function relax_orbit(s, d, r; g_tol, iterations, points = 4)
             g_tol = 0.01 * √rdl2,
             initial = q,
             iterations,
-            points,
+            as=[a],
         )
         Ω, μ = [J(q)[:] q[:]] \ L(q)[:]
         # TODO extrapolate Ω assuming geometric convergence
