@@ -30,9 +30,12 @@ export Superfluid,
     sample,
     argand,
     interpolate
+    
+# TODO antivortices and general winding numbers
 
 using LinearAlgebra, BandedMatrices, LinearMaps, Optim, Arpack, FFTW
 using Statistics: mean
+# TODO only import the basic ODE solvers, not the whole whole DifferentialEquations ecosystem
 import DifferentialEquations, DiffEqOperators, Interpolations
 
 """
@@ -48,6 +51,7 @@ end
 
 Superfluid{N}(C::Real, V = (x...) -> 0.0; hbm::Real = default(:hbm)) where {N} =
     Superfluid{N}(convert(Float64, C), convert(Float64, hbm), V)
+Superfluid(_...) = error("Superfluid constructor requires ndims type parameter")
 
 
 """
@@ -56,6 +60,7 @@ Superfluid{N}(C::Real, V = (x...) -> 0.0; hbm::Real = default(:hbm)) where {N} =
 A domain with a way to discretise an order parameter on it.
 """
 abstract type Discretisation{N} end
+(::Type{<:Discretisation})(_...) = error("Discretisation constructors require ndims type parameter")
 
 # Macros to generate optional arguments.  These require the Superfluid
 # and Discretisation types

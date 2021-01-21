@@ -63,12 +63,14 @@ function relax(
     )
 end
 
-
+@defaults cloud(d::Discretisation, rvs...)
 """
     cloud(d::Discretisation, rvs...)
 
 Sample a smooth field that will efficiently relax
 """
+cloud
+
 function cloud(d::Sampling{2}, rvs::Vararg{Complex{Float64}})
     f(x, y) = cos(π * x / (d.n + 1) / d.h) * cos(π * y / (d.n + 1) / d.h)
     z = argand(d)
@@ -79,8 +81,6 @@ function cloud(d::Sampling{2}, rvs::Vararg{Complex{Float64}})
     end
     normalize!(φ)
 end
-
-cloud(rvs::Vararg{Complex{Float64}}) = cloud(default(:discretisation), rvs...)
 
 
 """
@@ -98,6 +98,22 @@ that many stationary lattices occur at saddle points of the energy
 functional.
 """
 
+
+"""
+    Ω, q = angular_frequency(s, d, rvs...; [Optim args])
+
+Return a frequency and order parameter for vortices at rvs
+
+The results minimise the GPE residual.
+"""
+function angular_frequency(s, d, rvs...; as, Ωs, g_tol, iterations)
+    function wdisc(Ω)
+        ψ = steady_state(s, d; rvs, Ω, g_tol, iterations, as)
+        w2, _ = [J(q)[:] q[:]] \ L(q)[:] |> real
+        w2-w
+    end
+
+end
 
 """
     Ω, q = relax_orbit(s, d, r; Ωs, g_tol, iterations)

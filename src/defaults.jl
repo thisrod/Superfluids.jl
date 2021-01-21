@@ -2,7 +2,7 @@
 
 default(k::Symbol) = get(_defaults, k, nothing)
 default() = copy(_defaults)
-default!(k::Symbol, v) = (_defaults[k] = v; nothing)
+default!(k::Symbol, v) = (_defaults[k] = v)
 default!(d::Dict{Symbol,Any}) = (_defaults = copy(d); nothing)
 default!(v::Superfluid) = default!(:superfluid, v)
 default!(v::Discretisation) = default!(:discretisation, v)
@@ -54,8 +54,12 @@ elisions(_, t::Union{Type{Superfluid}, Type{Discretisation}}, ts...) =
     [(j+1)=>s for (j,s) in elisions(t, ts...)]
 
 function elided(E, ds)
+    f(E::Symbol) = E
+    f(E::Xpn{:(::)}) = E[1]
+    f(E::Xpn{:(...)}) = E
+    f(E::Xpn{:kw}) = f(E[1])
     as = args(E)
-    bs = copy(as)
+    bs = Any[f(a) for a in as]
     for d in ds
         bs[d[1]] = :( $default($(QuoteNode(d[2]))) ) |> xpn
     end
@@ -113,11 +117,13 @@ method_call(E::Xpn{:call}, args, kwargs=[Xpn(:(kwargs...))]) =
         $(expr.(kwargs)...))) |> Xpn
 
 function method_types(m::Xpn)
-    t(x::Symbol) = Any
+    t(x::Symbol) = :Any
+    t(E::Xpn{:(::)}) = E[2]
+    t(E::Xpn{:(...)}) = t(only(E))
+    t(E::Xpn{:kw}) = t(E[1])
     # In principle, type identifiers should be evaluated in the module
     # where @defaults is expanded.  In practice that is always Superfluids.
-    t(E::Xpn) = eval(E[2])
-    t.(args(m))
+    eval.(t.(args(m)))
 end
 
 _defaults = Dict{Symbol,Any}(

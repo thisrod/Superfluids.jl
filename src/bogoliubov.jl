@@ -1,5 +1,8 @@
 # Bogoliubov-de Gennes problems
 
+# Idea: find eigenvalues of B^2, with :SR.  The positive eigenvalues of B are the square roots.  Find eigenvectors of B belonging to those eigenvalues, then flip the modes with negative norms.
+# TODO investigate why Arpack fails to find the eigenvalues.
+
 """
     ωs, us, vs = bdg_modes(s, d, ψ, Ω, nmodes; nev=nmodes, raw=false)
     
@@ -65,7 +68,16 @@ function bdg_operator(s, d, ψ, Ω)
     )
 end
 
-function BdGmatrix(s, d, Ω, ψ)
+@defaults BdGmatrix(s::Superfluid, d::Discretisation, Ω, ψ)
+
+"""
+    BdGmatrix([s], [d], Ω, ψ)
+
+Return the matrix of the BdG operator.
+"""
+BdGmatrix
+
+function BdGmatrix(s::Superfluid, d::Discretisation, Ω, ψ)
     # TODO make this a BlockBandedMatrix
     T, V, U, J, L = matrices(s, d, Ω, ψ, :T, :V, :U, :J, :L)
     Q = diagm(0 => ψ[:])
