@@ -54,8 +54,14 @@ elisions(_, t::Union{Type{Superfluid}, Type{Discretisation}}, ts...) =
     [(j+1)=>s for (j,s) in elisions(t, ts...)]
 
 function elided(E, ds)
+    # TODO convert xs::Vararg{T} to xs...
     f(E::Symbol) = E
-    f(E::Xpn{:(::)}) = E[1]
+    f(E::Xpn{:(::)}) = 
+        if E[2] isa Xpn{:curly} && E[2][1] == :Vararg
+            :( $(E[1])... ) |> xpn
+        else
+            E[1]
+        end
     f(E::Xpn{:(...)}) = E
     f(E::Xpn{:kw}) = f(E[1])
     as = args(E)
