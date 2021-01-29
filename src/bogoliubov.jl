@@ -146,3 +146,18 @@ function hartree_modes(s, d, ψ, nev, Ω; raw = false)
     raw || (us = [reshape(u, d.n, d.n) for u in eachcol(us)])
     ws, us
 end
+
+"Matrix whose columns are a basis for the space orthogonal to ψ"
+function householder1(ψ)
+    ψ = ψ[:]
+    n = length(ψ)
+    v = [norm(ψ); zeros(n-1)] - ψ
+    R = Matrix(I, n, n) - 2*v*v'/sum(abs2, v)
+    R[:, 2:end]
+end
+
+function householder2(ψ)
+    R = householder1(ψ)
+    Z = zero(R)
+    [R Z; Z R]
+end
