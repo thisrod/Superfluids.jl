@@ -29,13 +29,13 @@ function bdg_modes(s, d, ψ, Ω, nmodes; nev = nmodes, raw = false)
     end
 end
 
-function bdg_output(d, ew, ev)
+function bdg_output(d, ew, ev; safe=true)
     @info "max imag frequency" iw = norm(imag(ew), Inf)
     ew = real(ew)
     us = [reshape(ev[1:d.n^2, j], d.n, d.n) for j in eachindex(ew)]
     vs = [reshape(ev[d.n^2+1:end, j], d.n, d.n) for j in eachindex(ew)]
     ixs = findall(norm.(us) .> norm.(vs))
-    @assert length(ixs) == length(ew) ÷ 2
+    safe && @assert length(ixs) == length(ew) ÷ 2
     ew[ixs], us[ixs], vs[ixs]
 end
 
@@ -158,6 +158,7 @@ end
 
 function householder2(ψ)
     R = householder1(ψ)
+    S = householder1(conj(ψ))
     Z = zero(R)
-    [R Z; Z R]
+    [R Z; Z S]
 end
