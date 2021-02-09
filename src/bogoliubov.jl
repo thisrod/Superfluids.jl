@@ -29,14 +29,22 @@ function bdg_modes(s, d, ψ, Ω, nmodes; nev = nmodes, raw = false)
     end
 end
 
+"Select the positive norm modes, and reshape evs to 2D grid"
 function bdg_output(d, ew, ev; safe=true)
     @info "max imag frequency" iw = norm(imag(ew), Inf)
-    ew = real(ew)
-    us = [reshape(ev[1:d.n^2, j], d.n, d.n) for j in eachindex(ew)]
-    vs = [reshape(ev[d.n^2+1:end, j], d.n, d.n) for j in eachindex(ew)]
-    ixs = findall(norm.(us) .> norm.(vs))
-    safe && @assert length(ixs) == length(ew) ÷ 2
-    ew[ixs], us[ixs], vs[ixs]
+    ewr = real(ew)
+    us = [reshape(ev[1:d.n^2, j], d.n, d.n) for j in eachindex(ewr)]
+    vs = [reshape(ev[d.n^2+1:end, j], d.n, d.n) |> conj for j in eachindex(ewr)]
+    if safe
+        ixs = @. norm(us) > norm(vs)
+        @assert count(ixs) == length(ew) ÷ 2
+        ws = ew[ixs]
+        wws = -ew[.!ixs]
+        @info "max freq discrep" norm(sort(ws, by=abs) - sort(wws, by=abs), Inf)
+        ewr[ixs], us[ixs], vs[ixs]
+    else
+        ewr, us, vs
+    end
 end
 
 "expand f(u) as a matrix over us"

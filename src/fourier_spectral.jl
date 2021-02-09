@@ -25,8 +25,8 @@ finterp(d::FourierDiscretisation{2}, r, a) =
     finterp1(d, real(r), a) .* transpose(finterp1(d, imag(r), a))
 
 function finterp1(d, r::Float64, a = 0.0)
+    a < eps() && return finterp0(d, r)
     x = first(daxes(d))[:]
-    a = max(a, eps())
     # Centre on a grid point in case a « h
     j = argmin(@. abs(x - r))
     x0 = x[j]
@@ -37,6 +37,14 @@ function finterp1(d, r::Float64, a = 0.0)
     @. u *= exp(-1im * ks * (r - x0))
     ifft!(u)
     real(u)
+end
+
+# sinc shortcut for a = 0
+function finterp0(d, r::Float64)
+    x = first(daxes(d))[:]
+    y = @. sin(π*(x-r)/d.h)/d.n/tan(π*(x-r)/d.n/d.h)
+    @. y[abs(x-r) < eps()] = 1
+    y
 end
 
 function dmats(d::FourierDiscretisation{2})

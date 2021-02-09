@@ -105,6 +105,7 @@ functional.
 Return a frequency and order parameter for vortices at rvs
 
 The results minimise the GPE residual.
+TODO automatically set `as`.
 """
 function angular_frequency(s, d, rvs...; as, Ωs, g_tol, iterations)
     function wdisc(Ω)
@@ -112,7 +113,10 @@ function angular_frequency(s, d, rvs...; as, Ωs, g_tol, iterations)
         w2, _ = [J(q)[:] q[:]] \ L(q)[:] |> real
         w2-w
     end
-
+    
+    result = optimize(abs2∘wdisc, Ωs..., abs_tol=g_tol)
+    Ω = result.minimizer
+    Ω, steady_state(s, d; rvs, Ω, g_tol, iterations, as)
 end
 
 """
