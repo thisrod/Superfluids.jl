@@ -36,13 +36,13 @@ function relax(
     d::Discretisation{2};
     Ω::Float64 = 0.0,
     rvs::Vector{Complex{Float64}} = Complex{Float64}[],
-    initial = cloud(d, rvs...),
+    initial = cloud(d, rvs),
     g_tol = default(:g_tol),
     relaxer = default(:relaxer),
     iterations = default(:iterations),
     store_trace = false,
     show_trace = false,
-    kwargs...,
+    as = zeros(length(rvs)),
 )
 
     L!, H = operators(s, d, :L!, :H)
@@ -51,7 +51,7 @@ function relax(
         ψ -> dot(ψ, H(ψ; Ω)) |> real,
         (y, ψ) -> (L!(y, ψ; Ω); y .*= 2),
         initial,
-        relaxer(manifold = PinnedVortices(d, rvs...; kwargs...)),
+        relaxer(manifold = PinnedVortices(d, rvs, as)),
         Optim.Options(
             iterations = iterations,
             g_tol = g_tol,
@@ -63,32 +63,41 @@ function relax(
     )
 end
 
-@defaults cloud(d::Discretisation, rvs...)
+"Specification of vortex locations and charges"
+const PlaneCoordinate = Union{Complex{Float64}, Vector{Float64}}
+
+@defaults cloud(d::Discretisation, rvs)
 """
-    cloud(d::Discretisation, rvs...)
+    cloud(d::Discretisation, rvs)
 
 Sample a smooth field that will efficiently relax
 """
 cloud
 
-function cloud(d::Sampling{2}, rvs::Vararg{Complex{Float64}})
+vortex(rv::Complex{Float64}) = rv, 1
+vortex(v::Tuple{Complex{Float64}, Int}) = v
+
+function cloud(d::Sampling{2}, rvs=[])
     f(x, y) = cos(π * x / (d.n + 1) / d.h) * cos(π * y / (d.n + 1) / d.h)
     z = argand(d)
     φ = similar(z)
     φ .= sample(f, d)
-    for r in rvs
-        @. φ *= (z - r)
+    for (r, n) in vortex.(rvs)
+        @. φ *= n ≥ 0 ? (z - r)^n : conj(z-r)^-n
     end
     normalize!(φ)
 end
 
+
+# TODO steady_lattice, steady_state and steady_rotation call relax_lattice, relax_state and relax_rotation.  The relax_ routines pass extra kwargs on to optimize.
 
 """
     Ω, ψ, rvs = steady_lattice(f, s, d, ps...; method=:residual)
 
 Return a relaxed lattice configuration
 
-The function `f(p1, p2, ...)` returns a list of vortex positions.
+The configuration consists of a rotation rate `Ω` and a vector of vortices `rvs`.
+The function `Ω, rvs = f(p1, p2, ...)` returns a configuration.
 The parameters are relaxed from the initial values `ps`.
 
 By default, the configuration is adjusted to minimize the residual
@@ -98,20 +107,45 @@ that many stationary lattices occur at saddle points of the energy
 functional.
 """
 
+function relax_state(s, d, Ω, rvs, as, initial, relaxer; kwargs...)
+    L!, H = operators(s, d, :L!, :H)
+    # TODO use allocation-free H!
+    Optim.optimize(
+        ψ -> dot(ψ, H(ψ; Ω)) |> real,
+        (y, ψ) -> (L!(y, ψ; Ω); y .*= 2),
+        initial,
+        relaxer(manifold = PinnedVortices(d, rvs, as)),
+        Optim.Options(kwargs...)
+    )
+end
+
+# TODO combine precession rate discrepency and residual at best precession rate
+
+# TODO capture ψ during parameter relaxation, instead of recalculating it
+
+"Outer and inner are relaxation methods, kwargs are for Optim"
+function relax_lattice(f, s, d, initial, as, outer, inner; kwargs...)
+    L = operators(s, d, :L) |> only
+    function rsdl(ps)
+        Ω, rvs = f(ps)
+        relax_state(s, d, Ω, rvs, as, inner; kwargs)
+    end
+end
 
 """
-    Ω, q = angular_frequency(s, d, rvs...; [Optim args])
+    Ω, q = angular_frequency(s, d, rvs; [Optim args])
 
 Return a frequency and order parameter for vortices at rvs
 
 The results minimise the GPE residual.
-TODO automatically set `as`.
+TODO automatically set `as`, possibly by wrapping this a routine that checks the winding number.
 """
-function angular_frequency(s, d, rvs...; as, Ωs, g_tol, iterations)
+function angular_frequency(s, d, rvs; as, Ωs, g_tol, iterations)
+    J, L = operators(s, d, :J, :L)
     function wdisc(Ω)
-        ψ = steady_state(s, d; rvs, Ω, g_tol, iterations, as)
+        q = steady_state(s, d; rvs, Ω, g_tol, iterations, as)
         w2, _ = [J(q)[:] q[:]] \ L(q)[:] |> real
-        w2-w
+        w2-Ω
     end
     
     result = optimize(abs2∘wdisc, Ωs..., abs_tol=g_tol)
@@ -135,7 +169,7 @@ function relax_orbit(s, d, r; g_tol, iterations, a=0)
     r = convert(Complex{Float64}, r)
     Ω = 0.0
     rdl2 = 0.01
-    q = Superfluids.cloud(d, r)
+    q = Superfluids.cloud(d, [r])
     for _ = 1:100
         rdl2 < g_tol^2 && break
         q = steady_state(

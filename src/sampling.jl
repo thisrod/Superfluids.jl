@@ -14,6 +14,11 @@ argand(f, d::Sampling) = f.(argand(d))
 # argand(d::Discretisation) = sample(Complex, d)
 argand(d::Sampling) = sample((x, y) -> x + 1im * y, d)
 
+"""
+    interpolate(d, u, r)
+    
+Return the value of u interpolated at r
+"""
 interpolate(d::Sampling, u, r) = dot(interpolant(d, r), u)
 
 """

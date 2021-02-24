@@ -241,7 +241,11 @@ V(0.2,0.3) ≈ V1(0.2,0.3) ≈ interpolate(u, d, 0.2, 0.3)
 # 
 # TODO figure out how to specify vortex lines in 3D (and soliton lines in 2D, if they exist)
 # 
-# # 
+# A vortex is specified either as either a core location `rv`, or a
+# two-element collection `(rv, n)`.  The location `rv` is specified
+# in any of the acceptable forms of coordinates, and `n` is a winding
+# number, which defaults to 1 when only `rv` is supplied.
+# 
 # Relaxing vortex positions with fixed rotation frequency
 # 
 # Finding a frequency where a set lattice is steady

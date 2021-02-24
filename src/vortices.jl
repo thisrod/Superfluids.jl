@@ -133,7 +133,7 @@ end
 adjacent_index(j, k) = -1 ≤ j[1] - k[1] ≤ 1 && -1 ≤ j[2] - k[2] ≤ 1
 
 """
-    PinnedVortices([s], [d], rv...) <: Optim.Manifold
+    PinnedVortices([d], rvs, as) <: Optim.Manifold
 
 Constrain a field to have vortices centred at the rvs
 
@@ -149,8 +149,8 @@ struct PinnedVortices <: Manifold
 
     function PinnedVortices(
         d::Sampling{2},
-        rvs::Vararg{Complex{Float64}};
-        as = zeros(length(rvs)),
+        rvs::Vector{Complex{Float64}},
+        as::Vector{Float64}
     )
         U = Array{Complex{Float64}}(undef, d.n^2, length(rvs))
         V = similar(U)
@@ -171,10 +171,12 @@ Subtracting this is a stable way to shift a vortex by further than one pixel.
 """
 function finterp end
 
-PinnedVortices(d::Discretisation, rvs::Vararg{Number}; kwargs...) =
-    PinnedVortices(d, [convert(Complex{Float64}, r) for r in rvs]...; kwargs...)
-PinnedVortices(rvs::Vararg{Number}; kwargs...) =
-    PinnedVortices(default(:discretisation), rvs...; kwargs...)
+# use coordinates instead of this
+
+# PinnedVortices(d::Discretisation, rvs::Vararg{Number}; kwargs...) =
+#     PinnedVortices(d, [convert(Complex{Float64}, r) for r in rvs]...; kwargs...)
+# PinnedVortices(rvs::Vararg{Number}; kwargs...) =
+#     PinnedVortices(default(:discretisation), rvs...; kwargs...)
 
 function prjct!(M, q)
     w = q[:]

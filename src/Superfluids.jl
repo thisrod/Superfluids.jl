@@ -67,6 +67,9 @@ abstract type Discretisation{N} end
 
 include("defaults.jl")
 
+# TODO look into sampling by broadcast.  Can this be done for
+# collocation, including quadrature weights?
+
 @defaults sample(f, d::Discretisation)
 """
     sample(f, d::Discretisation)
@@ -207,8 +210,14 @@ TODO specify how `J` works in 2D and 3D.
 """
 function primitive_operators(::Discretisation) end
 
+"Convert 1D real and 2D complex to coordinate vectors"
+coordinates(x) =
+    "Coordinates must be float, complex or vector" |> ArgumentError |> throw
+coordinates(x::Vector{Float64}) = x
+coordinates(x::Float64) = [x]
+coordinates(z::Complex{Float64}) = [real(z), imag(z)]
 
-coords(d::Discretisation{N}) where {N} = [sample((r...) -> r[j], d) for j = 1:N]
+# coords(d::Discretisation{N}) where {N} = [sample((r...) -> r[j], d) for j = 1:N]
 
 include("sampling.jl")
 include("finite_difference.jl")
