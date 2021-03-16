@@ -29,22 +29,29 @@ function bdg_modes(s, d, ψ, Ω, nmodes; nev = nmodes, raw = false)
     end
 end
 
-"Select the positive norm modes, and reshape evs to 2D grid"
-function bdg_output(d, ew, ev; safe=true)
-    @info "max imag frequency" iw = norm(imag(ew), Inf)
-    ewr = real(ew)
-    us = [reshape(ev[1:d.n^2, j], d.n, d.n) for j in eachindex(ewr)]
-    vs = [reshape(ev[d.n^2+1:end, j], d.n, d.n) |> conj for j in eachindex(ewr)]
-    if safe
-        ixs = @. norm(us) > norm(vs)
-        @assert count(ixs) == length(ew) ÷ 2
-        ws = ew[ixs]
-        wws = -ew[.!ixs]
-        @info "max freq discrep" norm(sort(ws, by=abs) - sort(wws, by=abs), Inf)
-        ewr[ixs], us[ixs], vs[ixs]
-    else
-        ewr, us, vs
+"""
+    bdg_output(d, ew, ev; safe=true)
+
+Select the positive norm modes, and reshape evs to 2D grid
+"""
+function bdg_output(d, ew, ev; safe=true, a_tol=sqrt(eps()))
+    us = [reshape(ev[1:d.n^2, j], d.n, d.n) for j in eachindex(ew)]
+    vs = [reshape(ev[d.n^2+1:end, j], d.n, d.n) |> conj for j in eachindex(ew)]
+    safe || return ew, us, vs
+    ixs = @. norm(us) > norm(vs)
+    # There are 3 cases:
+    # ω ≈ 0, norm(u) ≈ norm(v)
+    # ω real, norm(u) > norm(v)
+    # ω imaginary, v = exp(iφ)*u
+    # TODO think about which degenerate pair to take in the imaginary case
+    if count(ixs) != length(ew) ÷ 2
+        for j = 1:2:length(ixs)
+            ixs[j] ⊻ ixs[j+1] && continue
+            @assert all(@. abs(real(ew[j:j+1])) < a_tol)
+            ixs[j] = !ixs[j]
+        end
     end
+    ew[ixs], us[ixs], vs[ixs]
 end
 
 "expand f(u) as a matrix over us"
