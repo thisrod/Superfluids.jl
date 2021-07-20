@@ -166,8 +166,10 @@ end
 function householder1(ψ)
     ψ = ψ[:]
     n = length(ψ)
-    v = [norm(ψ); zeros(n-1)] - ψ
-    R = Matrix(I, n, n) - 2*v*v'/sum(abs2, v)
+    u = ψ[1]/abs(ψ[1])
+    v = ψ + [u*norm(ψ); zeros(n-1)]
+    normalize!(v)
+    R = Matrix(I, n, n) - 2*v*v'
     R[:, 2:end]
 end
 
