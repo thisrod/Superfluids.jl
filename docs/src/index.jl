@@ -211,7 +211,42 @@ V(0.2,0.3) ≈ V1(0.2,0.3) ≈ interpolate(u, d, 0.2, 0.3)
 
 # ### Operators
 # 
-# These scale with h to keep repulsion consistent
+# 
+# Most physicists are familiar with Schrödinger's equation.  This is
+# linear in the wave function ψ, so the normalisation of ψ can be
+# arbitrary: if ψ is a solution, so is cψ for any scalar c.  The
+# Gross-Pitaevskii equation, on the other hand, includes a nonlinear
+# term g|ψ|²ψ.  Therefore, the normalisation of ψ is not arbitrary.
+# Physically, this corresponds to the wave function describing a
+# single particle, while the order parameter describes an arbitrary
+# number, and its norm corresponds to the number of particles.
+# 
+# There is however some arbitrariness, because of the repulsion
+# constant g.  If the norm of ψ varies as 1/√g, the term g|ψ|² stays
+# constant.  So, for example, for N particles you can have |ψ|²=N and
+# g a purely atomic constant, or |ψ|²=1 and a constant gN.  Any
+# numerical package needs to set a convention.  The package
+# `ColdAtomConventions` allows things to be constructed using other
+# conventions, and the results translated back.
+# 
+# In this package, the convention is that arrays representing order
+# parameters have unit 2-norm.  This is very convenient numerically.
+# This causes a subtlety, because the values stored in the array
+# depend on how the x axis is discretised, as well as the function
+# ψ(x).  For example, if the number of grid points is doubled, the
+# array values must be divided by √2 to maintain the norm.  This isn't
+# an issue for the linear derivative and poential operators.  The
+# implementation section below explains how the |ψ|² operator allows
+# for it.
+# 
+# In future, this package will include more complicated discretisations,
+# not just Fourier ones with equispaced grids.  For these discretisations,
+# the arrays for wave functions will still have unit norm.  To allow
+# this, they will contain values of ψ multiplied by the quadrature
+# weights for that discretisation.  The operator that multiplies by
+# |ψ|² will allow for that, in the same way as it allows for grid
+# size now.
+# 
 # 
 # ### Interpolation
 # 
@@ -221,18 +256,35 @@ V(0.2,0.3) ≈ V1(0.2,0.3) ≈ interpolate(u, d, 0.2, 0.3)
 # 
 # Plotting automatically interpolates
 # 
-# ## Loading and saving
-# 
-# Structure with source code, defaults, 
-# 
 # ## Steady state relaxation
 # 
-# `steady_state` for TF cloud
+
+The basic relaxation routine is `steady_state`.  This takes a frame rotation frequency, and a list of vortex positions, and relaxes the continuous part of the order parameter to a minimum energy given those constraints.  Vortices can be specified with `(position, winding_number)` pairs, or just by a position, in which case the winding number is 1.  Positions are real pairs or complex numbers.
+
 # 
-# Mutating forms `steady_state!` etc. that store the order parameter in the superfluid.
 # 
-# `steady_state` for pinned vortices
+# A key feature of `Superfluids` is the ability to relax the density and phase of the order parameter, while constraining the positions of the vortices it contains, and other parameters such as the frame rotation rate.  This is useful in several contexts.  The first is that many vortex lattices are stationary, but energetically unstable—the stationary point is a saddle point in energy space, not a minimum.  (It can't be a maximum, because there are lots of ways to add energy.)  The simplest case is a single precessing vortex, in systems whose ground state is either vortex-free, or a central vortex, depending on the frame rotation rate.  Many multi-vortex lattices have stable and unstable regions.  E.g., pair of vortices is stable near the trap centre, and unstable near the edges, with a transition at roughly half the Thomas-Fermi radius.  To compute the unstable stationary states, it is necessary to relax an order parameter that still has vortices, while adjusting their positions and the rotation rate to find the stationary point.
 # 
+# The other issue is that, when the ground state is a lattice, there are usually several stationary vortex configurations with very similar energies.  Unconstrained relaxation will give an order parameter with one of these configurations, but not necessarily the one whose energy is a global minimum.  With constrained relaxation, it is possible to find the minimum energy state with every plausible configuration, and compare them to find the global minimum.  As a bonus, the global minimum is more stable, while unconstrained relaxation can jump between the local minima with small changes in the system parameters.
+# 
+# A concern with this approach is that the constraint distorts the order parameter, so it does not relax to the true ground state.  Sometimes, that is inevitable.  If the rotation rate and the vortex position have been chosen to be inconsistent with each other, then the system does not have a stationary state that satisfies the constraints.  Any state that is constrained to be stationary must be distorted somehow, and the form of the distortion is somewhat arbitrary.  In Superfluids, small values of the parameter `a` will cause the distortion to be localised near the vortex, so that the fluid away from the vortex is locally in a true stationary state.  Large values will spread the distortion out across a large part of the fluid, which often looks more physically reasonable.
+
+# On the other hand, suppose constraints have been chosen for which the system does have a stationary state (up to numerical precision in the constraints).  In the stationary state, the vortex positions are stationary too.  Therefore, as the system approaches its constrained equilibrium state, the effect of the projection that makes it satisfy the constraint reduces.  When the system reaches its constrained relaxed state, the constraint has no effect at all, and the relaxation process becomes exactly the same as the unconstrained one.  So, in the case where the unconstrained system has a stationary state that satisfies the constraintes, the constrained relaxation algorithm will find it.
+
+# There are two apparent ways to improve the vortex constraints.  The first is to use parallel transport, instead of doing a relaxation step and then projecting back on to the manifold.  Parallel transport is a bit strange.  The order parameters with a vortex at a given position form a linear submanifold: if you add two vortices, you get a vortex.  So, once the descent direction is projected to have a vortex at the right place, any order parameter along the line of descent should satisfy the constraints.  What goes wrong?
+
+Suppose there is a vortex at the origin, and the energy decreases if it moves in the positive x direction.  The descent direction is ∂/∂a (z-a) = -1, at least inside the vortex core.  Projecting this gives -1+δ(z), where δ(z) is a band-limited delta function.  So most of the core moves as if there were no constaint, but a delta spike is added to warp the phase singularity within a single pixel.  As we go along the descent direction, the vortex core actually does move, in the unconstrained way, but then a hole is poked at the constrained vortex position.  That's exactly what happens in simulations!
+
+What we really want to do, is move along the descent direction, while keeping the vortex in the same place.  This is no longer a linear projection operator.  The further the vortex moves, the larger a Gaussian needs to be added, so that the singularity is shifted back where it should be, but the order parameter remains fairly linear around the singularity.
+
+So we don't just want a descent line.  It needs to be a descent curve, where the further we go, the wider a Gaussian is added to return the vortex to its original position.  There is a way to estimate how large a Gaussian is needed, based on the coefficient of (z-a) in the order parameter around the vortex.  It isn't clear how to do that within the Optim framework, but it would be interesting to extend the framework to allow it.
+
+This also give an idea for dealing with vortices entering from the edge of the condensate.  You need to add a wide enough Gaussian to push them back to the edge.  Provided a wide enough Gaussian is added at each vortex core, there is no way for a vortex to form in the order parameter.  Adding sums of Gaussians shouldn't give a phase singularity.  Or if it does, that gives a limit on how far to follow the line of descent.
+
+
+# 
+
+# # 
 # ## Vortices and solitons
 # 
 # In 1D, soliton locations are specified as a vector of real numbers.
@@ -240,6 +292,59 @@ V(0.2,0.3) ≈ V1(0.2,0.3) ≈ interpolate(u, d, 0.2, 0.3)
 # In 2D, vortex core locations are a vector of pairs or complex numbers.
 # 
 # TODO figure out how to specify vortex lines in 3D (and soliton lines in 2D, if they exist)
+# 
+# As well as unconstrained relaxation, the `steady_state` function
+# supports relaxing the continuous part of the order parameter, while
+# maintaining a lattice of vortices with given positions.  For example,
+# a central vortex can be obtained (in 2D) by
+
+ψ = steady_state(rvs=[0])
+
+# In this case, `ψ` actually is a stationary state.  This can be
+# confimed by
+
+ψ ≈ steady_state(initial=ψ)
+
+# This is a bit of a fluke: in general, `steady_state` could return
+# `u*ψ`, where `u` is any complex number with `abs(u)=1`.  A more
+# reliable test is to project out the orthogonal component
+
+let q = steady_state(initial=ψ)
+    norm(q - dot(ψ,q)*ψ/norm(ψ)^2)
+
+# Not every lattice of vortices is stationary.  For example, in the
+# laboratory frame, an offset vortex precesses in an orbit.  In this
+# case, `steady_state` returns the least energy lattice with vortices
+# at those positions.
+
+steady_state(rvs=[-1, 1])
+
+# In a frame that rotates at the precession frequency, these lattices
+# will be stationary
+
+steady_state(rvs=[1], Ω=...)
+
+# The `rvs` argument ensures that the specified vortices are present.
+# The current implementation does not ensure that other vortices are
+# absent.  This can fail in two ways.  If the frame rotation rate is
+# too slow compared to the lattice precession rate, anti-vortices
+# will form right next to some of the vortices.  This produces an
+# odd-looking wave function, with the hole for a vortex core, but no
+# phase winding around it.  (This is not a physically meaninful state:
+# the least energy problem becomes highly contrived when the vortices
+# are constrained to form a non-stationary lattice.)
+
+steady_state(rvs=[3], Ω=0)
+
+# Conversely, if the frame rotation rate is too high, the result will
+# have vortices in the places specified, but the relaxation algorithm
+# will add some extra ones to reduce the energy.
+
+steady_state(rvs=[-1,1], Ω=0.8)
+
+# There is a numerical parameter `as`, that can amelorate the missing
+# vortices to some extent.  See the implementaion section for a
+# description of how this works.
 # 
 # A vortex is specified either as either a core location `rv`, or a
 # two-element collection `(rv, n)`.  The location `rv` is specified
@@ -252,12 +357,60 @@ V(0.2,0.3) ≈ V1(0.2,0.3) ≈ interpolate(u, d, 0.2, 0.3)
 # 
 # ## GPE dynamics
 # 
-# The `solve` function.  Easy.
+
+# The Gross-Pitaevskii equation is solved by the function `integrate`.  This takes an initial order parameter, and a vector of times to return solutions.  It returns a vector of solutions.
+
+# The solver uses Julia's `DifferentialEquations` package.  A Version 1 goal is to implement RK4IP, the standard GPE integration method, or to provide matrix exponentials for the ODE methods.
+
 # 
 # Plotting dynamics gives an animation: `plot(::Discretisation{N}, ts, ψs)'.  Where `ψs` can be an `N+1` array, or a vector of `N` arrays. 
 # 
 # ## Bogoliubov de-Gennes modes
 # 
+# 
+# When the Bogoliubov de-Gennes equations are diagonalised, they give
+# a symplectic(?) matrix, not a Hermitian one.  That is to say, the
+# eigenvectors are orthogonal under an inner product, but it is the
+# Lorentz one instead of the Euclidean one: the |u|² and |v|² components
+# are subtracted rather than added.  The science of diagonalizing
+# such matrices is poorly developed.  Therefore, this package focuses
+# on generating the matrix (or functions that implement the linear
+# transformation, for iterative methods), and on validating and
+# cleaning up the output.  It largely leaves the diagonalisation
+# routine up to the user.  The built in eigen works fine for small
+# problems.
+# 
+# The functions bdg_matrix and bdg_operators take a system, a
+# discretisation, and a condensate order parameter.  They return the
+# discretised BdG matrix.  This gets large quickly!  An n×n grid has
+# n² points, so a (u,v) vector has 2n² elements, and the BdG matrix
+# over these vectors has 4n⁴ elements.
+# 
+# The eigenproblem has an inherent degeneracy.  For any solution
+# (u,v,ω), there is also a solution (v,u,-ω) check conjugates.  These
+# represent the same physical mode.  The usual approach, and the
+# correct one from a quantum point of view, is to keep the positive
+# norm modes, where |u|²>|v|².  The function bdg_output checks that
+# the modes are paired in the expected way, and returns the positive
+# norm ones.  It also reshapes the matrix of eigenvectors into arrays
+# of u and v matrices.  There is a raw option, which does not perform
+# the checks, but does the reshaping.  This is useful when odd things
+# happen with the diagonalisation—as they often do, because the usual
+# routines aren't designed for symplectic problems.
+# 
+# The non-orthogonal eigenvectors interact in inconvenient ways with
+# degeneracies.  People have found that the diagonalisation is more
+# stable numerically if the condensate mode is removed.  (It's a zero
+# mode, so other modes must be orthogonal to it in the Euclidean
+# sense.)  The bdg_matrix routine has an option to project into the
+# space orthogonal to the condensate, which is done by Householder
+# reflection.
+# 
+# David Hutchinson came up with a better way of doing the diagonalisation,
+# for the special case where the order parameter is real.  I haven't
+# implemented this yet, because the library has largely been used for
+# vortex lattices, but it's the to-do list.
+
 # The matrix functions
 # 
 # Normalisation with `norm2(u)-norm2(v) == 1`.
@@ -266,6 +419,15 @@ V(0.2,0.3) ≈ V1(0.2,0.3) ≈ interpolate(u, d, 0.2, 0.3)
 # 
 # Animating modes
 # 
+
+## Future Directions
+
+# Currently, `System` and `Discretisation` need to be passed around separately to the arrays of wave functions.  It would be good if Julia had an effective way to attach annotations like these to arrays, especially when the arrays are saved to JLD files.  The drawback to that is that array types nest, and there is currently no way for the compiler to figure out that, somewhere inside all the annotation types, there are `Diagonal` arrays with optimised methods.  Instead, it tends to index into the arrays, make a dense copy of their elements, and use the GE routines.
+
+# Solving this will require some changes to the Julia array ecosystem.  There should be a conventional type nesting hierarchy, with structured storage at the bottom (Diagonal), lazy restrides above that (reshape, transpose, etc), then annotations.  The upper layers could also be rationalised.  Almost all of the lazy reshape types could be absorbed into one `RestridedArray`, with a type parameter for conjugation.  All the annotation types could be type parameters on an `AnnotatedArray{Union of annotation types}`, although that might require a special `Annotation{T,R,S,...}` to be added to Julia's type system, to avoid everything bcoming an `AnnotatedArray{Any}`.  The idea would be for compatible annotations to be promoted and merged.
+
+Inside that idea is a simpler broadcasting interface, where the container types are promoted by a similar mechanism to the element types.
+
 # ## Parameters and defaults
 # 
 # Like `Plots.jl`, this package has a lot of parameters that users will
@@ -323,6 +485,36 @@ V(0.2,0.3) ≈ V1(0.2,0.3) ≈ interpolate(u, d, 0.2, 0.3)
 # -∇(rv) works in practice.
 # 
 # Structured BdG matrices
+
+## Solving the BdG eigenproblem
+
+The current implementation of BdG solving is brute force.  The
+elements of the BdG operator are written to a dense matrix, which
+is diagonalised with the LAPACK eig routine.  There is a complication:
+there are often several zero modes, which form a degenerate eigenspace.
+When a hermitian matrix is diagonalised, that would not be a problem,
+because the solver would return a set of orthogonal vectors spanning
+the space.  However, the BdG matrix is not hermitian, so the solver
+will return a quite arbitrary set of vectors spannign the space.
+To fix this, the matrix `B` is transformed to `H* B H`, where `H`
+is a Householder reflection matrix, whose columns are a basis for
+the space orthogonal to the condensate mode.  Then `eig` gives all
+the modes except for the condensate mode, which is added on explicitly
+by `bdg_output`.
+
+It would be (very) nice to solve this by an iterative method.  The
+problem is the degeneracy, where every frequency occurs as ω and
+-ω.  Iterative solvers pick off the eigenvalues at the edge of the
+spectrum, and we're usually interested in the modes with small ω,
+which line in the middle of the degenerate spectrum.  There is a
+standard solution to this: instead of diagonalising `B`, diagonalise
+`B⁻¹`.  However, this relies on a method of computing `B⁻¹`.  There
+are iterative methods to do that, and no doubt someone has designed
+an algorithm that combines iterative diagonalisation with shift and
+iterative inversion.  If you know where to find that, please tell
+me—my (half hearted) attempts to reinvent it have been numerically
+unstable.
+
 # 
 # ### Normalization
 # 
